@@ -51,7 +51,6 @@ def test(data,
         device = next(model.parameters()).device  # get model device
 
     else:  # called directly
-        set_logging()
         device = select_device(device, batch_size=batch_size)
 
         # Directories
@@ -78,7 +77,7 @@ def test(data,
         with open(data) as f:
             data = yaml.safe_load(f)
     check_dataset(data)  # check
-    is_coco = data['val'].endswith('coco/val2017.txt')  # COCO dataset
+    is_coco = type(data['val']) is str and data['val'].endswith('coco/val2017.txt')  # COCO dataset
     nc = 1 if single_cls else int(data['nc'])  # number of classes
     iouv = torch.linspace(0.5, 0.95, 10).to(device)  # iou vector for mAP@0.5:0.95
     niou = iouv.numel()
@@ -294,7 +293,7 @@ def test(data,
     return (mp, mr, map50, map, *(loss.cpu() / len(dataloader)).tolist()), maps, t
 
 
-if __name__ == '__main__':
+def parse_opt():
     parser = argparse.ArgumentParser(prog='test.py')
     parser.add_argument('--data', type=str, default='data/coco128.yaml', help='dataset.yaml path')
     parser.add_argument('--weights', nargs='+', type=str, default='yolov5s.pt', help='model.pt path(s)')
@@ -319,7 +318,12 @@ if __name__ == '__main__':
     opt.save_json |= opt.data.endswith('coco.yaml')
     opt.save_txt |= opt.save_hybrid
     opt.data = check_file(opt.data)  # check file
-    print(opt)
+    return opt
+
+
+def main(opt):
+    set_logging()
+    print(colorstr('test: ') + ', '.join(f'{k}={v}' for k, v in vars(opt).items()))
     check_requirements(exclude=('tensorboard', 'thop'))
 
     if opt.task in ('train', 'val', 'test'):  # run normally
@@ -344,3 +348,8 @@ if __name__ == '__main__':
             np.savetxt(f, y, fmt='%10.4g')  # save
         os.system('zip -r study.zip study_*.txt')
         plot_study_txt(x=x)  # plot
+
+
+if __name__ == "__main__":
+    opt = parse_opt()
+    main(opt)
