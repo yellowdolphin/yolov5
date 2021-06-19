@@ -1,6 +1,7 @@
 import argparse
 import logging
 import math
+import sys
 import os
 import random
 import time
@@ -21,6 +22,7 @@ from torch.cuda import amp
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
+#from fastprogress import fastprogress
 
 import test  # import test.py to get mAP after each epoch
 from models.experimental import attempt_load
@@ -36,10 +38,18 @@ from utils.plots import plot_images, plot_labels, plot_results, plot_evolution
 from utils.torch_utils import ModelEMA, select_device, intersect_dicts, torch_distributed_zero_first, de_parallel
 from utils.wandb_logging.wandb_utils import WandbLogger, check_wandb_resume
 
-logger = logging.getLogger(__name__)
-
+logger = logging.getLogger(__name__)  # child of logging.root, no own handler. Purpose?
 
 def train(hyp, opt, device, tb_writer=None):
+    #print("logging.root.level:", logging.root.level)
+    print("logging.root.handlers:", logging.root.handlers)
+    #print("logging.lastResort:", logging.lastResort)
+    #if logging.root.level > 20: 
+    #    logging.root.setLevel(logging.INFO)
+    if (len(logging.root.handlers) == 1) and hasattr(logging.root.handlers[0], 'baseFilename'):
+        # Logging to /tmp/kaggle.log is fine, but we also need stdout!
+        logger.addHandler(logging.StreamHandler(sys.stdout))
+
     logger.info(colorstr('hyperparameters: ') + ', '.join(f'{k}={v}' for k, v in hyp.items()))
     save_dir, epochs, batch_size, total_batch_size, weights, rank, single_cls = \
         Path(opt.save_dir), opt.epochs, opt.batch_size, opt.total_batch_size, opt.weights, opt.global_rank, \
@@ -101,10 +111,10 @@ def train(hyp, opt, device, tb_writer=None):
     test_path = data_dict['val']
 
     # Freeze
-    freeze = []  # parameter names to freeze (full or partial)
+    freeze = [f'model.{n}.' for n in range(10)] if hyp.get('freeze_backbone', False) else []
     for k, v in model.named_parameters():
         v.requires_grad = True  # train all layers
-        if any(x in k for x in freeze):
+        if any(x in k for x in freeze) and not 'bn' in k:
             print('freezing %s' % k)
             v.requires_grad = False
 
@@ -163,9 +173,14 @@ def train(hyp, opt, device, tb_writer=None):
             results_file.write_text(ckpt['training_results'])  # write results.txt
 
         # Epochs
-        start_epoch = ckpt['epoch'] + 1
-        if opt.resume:
-            assert start_epoch > 0, '%s training to %g epochs is finished, nothing to resume.' % (weights, epochs)
+        start_epoch = ckpt['epoch'] + 1  # ckpt['epoch'] is -1 if training fininshed
+        if opt.resume and start_epoch == 0:
+            # epochs: from --epochs, opt.finished_epochs from opt.yaml, ckpt['epoch'] = -1
+            #assert start_epoch > 0, '%s training to %g epochs is finished, nothing to resume.' % (weights, epochs)
+            assert opt.epochs > opt.finished_epochs, f'{weights} finished training {opt.finished_epochs} epochs, nothing to resume.'
+            print(f"Warning: Checkpoint file {weights} finished training for {opt.finished_epochs} epochs.")
+            print(f"         Training for {epochs - opt.finished_epochs} more epochs.")
+            ckpt['epoch'], start_epoch = opt.finished_epochs, opt.finished_epochs + 1
         if epochs < start_epoch:
             logger.info('%s has been trained for %g epochs. Fine-tuning for %g additional epochs.' %
                         (weights, ckpt['epoch'], epochs))
@@ -249,14 +264,16 @@ def train(hyp, opt, device, tb_writer=None):
                 f'Logging results to {save_dir}\n'
                 f'Starting training for {epochs} epochs...')
     for epoch in range(start_epoch, epochs):  # epoch ------------------------------------------------------------------
+        epoch_start = time.time()
         model.train()
 
         # Update image weights (optional)
         if opt.image_weights:
             # Generate indices
             if rank in [-1, 0]:
+                iw_exp = hyp.get('sample_weight_exp', 1)
                 cw = model.class_weights.cpu().numpy() * (1 - maps) ** 2 / nc  # class weights
-                iw = labels_to_image_weights(dataset.labels, nc=nc, class_weights=cw)  # image weights
+                iw = labels_to_image_weights(dataset.labels, nc=nc, class_weights=cw, exp=iw_exp)  # image weights
                 dataset.indices = random.choices(range(dataset.n), weights=iw, k=dataset.n)  # rand weighted idx
             # Broadcast if DDP
             if rank != -1:
@@ -273,9 +290,12 @@ def train(hyp, opt, device, tb_writer=None):
         if rank != -1:
             dataloader.sampler.set_epoch(epoch)
         pbar = enumerate(dataloader)
-        logger.info(('\n' + '%10s' * 8) % ('Epoch', 'gpu_mem', 'box', 'obj', 'cls', 'total', 'labels', 'img_size'))
+        logger.propagate = False  # don't log tqdm and every iter to file
+        logger.info(('\n' + '%10s' * 8) % ('Epoch', 'gpu_mem', 'box', 'obj', 'cls', 'total', 'Iter', 'Wall')) 
+                                                                                           #, 'labels', 'img_size'))
         if rank in [-1, 0]:
-            pbar = tqdm(pbar, total=nb)  # progress bar
+            pbar = tqdm(pbar, total=nb)
+            #pbar = fastprogress.progress_bar(pbar, total=nb)
         optimizer.zero_grad()
         for i, (imgs, targets, paths, _) in pbar:  # batch -------------------------------------------------------------
             ni = i + nb * epoch  # number integrated batches (since train start)
@@ -322,10 +342,17 @@ def train(hyp, opt, device, tb_writer=None):
 
             # Print
             if rank in [-1, 0]:
+                wall = (time.time() - epoch_start) / 60
                 mloss = (mloss * i + loss_items) / (i + 1)  # update mean losses
                 mem = '%.3gG' % (torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0)  # (GB)
-                s = ('%10s' * 2 + '%10.4g' * 6) % (
-                    f'{epoch}/{epochs - 1}', mem, *mloss, targets.shape[0], imgs.shape[-1])
+                s = '%10s' % f'{epoch}/{epochs - 1}'
+                s += '%10s' % mem
+                s += ('%10.4g' * len(mloss)) % (*mloss,)
+                s += '%10s' % f'{i}/{nb}'
+                s += '%10.2f' % wall
+                #s += ('%10.4g' * 2) % (targets.shape[0], imgs.shape[-1])
+                #s = ('%10s' * 2 + '%10.2g' + '%10s' + '%10.4g' * 5) % (
+                #    f'{epoch}/{epochs - 1}', f'{i}/{nb}', wall, mem, *mloss, targets.shape[0], imgs.shape[-1])
                 pbar.set_description(s)
 
                 # Plot
@@ -341,6 +368,7 @@ def train(hyp, opt, device, tb_writer=None):
                                                   save_dir.glob('train*.jpg') if x.exists()]})
 
             # end batch ------------------------------------------------------------------------------------------------
+            logger.propagate = True
         # end epoch ----------------------------------------------------------------------------------------------------
 
         # Scheduler
@@ -491,7 +519,7 @@ if __name__ == '__main__':
     # Set DDP variables
     opt.world_size = int(os.environ['WORLD_SIZE']) if 'WORLD_SIZE' in os.environ else 1
     opt.global_rank = int(os.environ['RANK']) if 'RANK' in os.environ else -1
-    set_logging(opt.global_rank)
+    set_logging(opt.global_rank)  # calls logging.basicConfig()
     if opt.global_rank in [-1, 0]:
         check_git_status()
         check_requirements(exclude=['thop'])
@@ -500,10 +528,13 @@ if __name__ == '__main__':
     wandb_run = check_wandb_resume(opt)
     if opt.resume and not wandb_run:  # resume an interrupted run
         ckpt = opt.resume if isinstance(opt.resume, str) else get_latest_run()  # specified or most recent path
-        assert os.path.isfile(ckpt), 'ERROR: --resume checkpoint does not exist'
+        assert os.path.isfile(ckpt), f'ERROR: --resume checkpoint {ckpt} does not exist'
         apriori = opt.global_rank, opt.local_rank
+        # allow --epochs to modify epochs from opt.yaml
+        epochs = opt.epochs
         with open(Path(ckpt).parent.parent / 'opt.yaml') as f:
             opt = argparse.Namespace(**yaml.safe_load(f))  # replace
+        opt.finished_epochs, opt.epochs = opt.epochs, epochs
         opt.cfg, opt.weights, opt.resume, opt.batch_size, opt.global_rank, opt.local_rank = \
             '', ckpt, True, opt.total_batch_size, *apriori  # reinstate
         logger.info('Resuming training from %s' % ckpt)
