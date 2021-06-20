@@ -314,8 +314,8 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
         if RANK != -1:
             dataloader.sampler.set_epoch(epoch)
         pbar = enumerate(dataloader)
-        logger.propagate = False  # don't log tqdm and every iter to file
-        logger.info(('\n' + '%10s' * 8) % ('Epoch', 'gpu_mem', 'box', 'obj', 'cls', 'total', 'Iter', 'Wall')) 
+        logger.propagate = False  # don't log every iter to file
+        logger.info(('\n' + '%10s' * 8) % ('Epoch', 'gpu_mem', 'box', 'obj', 'cls', 'total', 'Iter', 'Wall') + '  Learning rates') 
                                                                                            #, 'labels', 'img_size'))
         #if RANK in [-1, 0]:
         #    pbar = tqdm(pbar, total=nb)  # progress bar
@@ -373,6 +373,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                 s += ('%10.4g' * len(mloss)) % (*mloss,)
                 s += '%10s' % f'{i}/{nb}'
                 s += '%10.2f' % wall
+                s += ''.join(f"{pg['lr']:9.1e}" for pg in optimizer.param_groups)
                 #s += ('%10.4g' * 2) % (targets.shape[0], imgs.shape[-1])
                 #s = ('%10s' * 2 + '%10.2g' + '%10s' + '%10.4g' * 5) % (
                 #    f'{epoch}/{epochs - 1}', f'{i}/{nb}', wall, mem, *mloss, targets.shape[0], imgs.shape[-1])
