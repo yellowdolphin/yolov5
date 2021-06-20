@@ -56,9 +56,9 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
         # Logging to /tmp/kaggle.log is fine, but we also need stdout!
         logger.addHandler(logging.StreamHandler(sys.stdout))
 
-    logger.info(colorstr('hyperparameters: ') + ', '.join(f'{k}={v}' for k, v in hyp.items()))
     save_dir, epochs, batch_size, weights, single_cls = \
         opt.save_dir, opt.epochs, opt.batch_size, opt.weights, opt.single_cls
+    finished_epochs = opt.finished_epochs if hasattr(opt, 'finished_epochs') else None
 
     # Directories
     save_dir = Path(save_dir)
@@ -192,18 +192,21 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
             results_file.write_text(ckpt['training_results'])  # write results.txt
 
         # Epochs
+        print("ckpt['epoch']:", ckpt['epoch'])
         start_epoch = ckpt['epoch'] + 1  # ckpt['epoch'] is -1 if training fininshed
-        if opt.resume and start_epoch == 0:
+        if opt.resume and (ckpt['epoch'] == -1):
             # epochs: from --epochs, opt.finished_epochs from opt.yaml, ckpt['epoch'] = -1
             #assert start_epoch > 0, '%s training to %g epochs is finished, nothing to resume.' % (weights, epochs)
-            assert opt.epochs > opt.finished_epochs, f'{weights} finished training {opt.finished_epochs} epochs, nothing to resume.'
-            print(f"Warning: Checkpoint file {weights} finished training for {opt.finished_epochs} epochs.")
-            print(f"         Training for {epochs - opt.finished_epochs} more epochs.")
-            ckpt['epoch'], start_epoch = opt.finished_epochs, opt.finished_epochs + 1
+            assert epochs > finished_epochs, f'{weights} finished training {finished_epochs} epochs, nothing to resume.'
+            print(f"Warning: Checkpoint file {weights} finished training for {finished_epochs} epochs.")
+            print(f"         Training for {epochs - finished_epochs} more epochs.")
+            ckpt['epoch'], start_epoch = finished_epochs - 1, finished_epochs
         if epochs < start_epoch:
             logger.info('%s has been trained for %g epochs. Fine-tuning for %g additional epochs.' %
                         (weights, ckpt['epoch'], epochs))
             epochs += ckpt['epoch']  # finetune additional epochs
+        if start_epoch > 0:
+            print(f"Resuming training, start_epoch = {start_epoch}")
 
         del ckpt, state_dict
 
@@ -314,8 +317,8 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
         logger.propagate = False  # don't log tqdm and every iter to file
         logger.info(('\n' + '%10s' * 8) % ('Epoch', 'gpu_mem', 'box', 'obj', 'cls', 'total', 'Iter', 'Wall')) 
                                                                                            #, 'labels', 'img_size'))
-        if RANK in [-1, 0]:
-            #pbar = tqdm(pbar, total=nb)  # progress bar
+        #if RANK in [-1, 0]:
+        #    pbar = tqdm(pbar, total=nb)  # progress bar
         optimizer.zero_grad()
         for i, (imgs, targets, paths, _) in pbar:  # batch -------------------------------------------------------------
             ni = i + nb * epoch  # number integrated batches (since train start)
@@ -361,7 +364,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                     ema.update(model)
 
             # Print
-            if RANK in [-1, 0]:
+            if RANK in [-1, 0] and i % max(int(nb / 10), 1) == 0:
                 wall = (time.time() - epoch_start) / 60
                 mloss = (mloss * i + loss_items) / (i + 1)  # update mean losses
                 mem = '%.3gG' % (torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0)  # (GB)
@@ -373,7 +376,8 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                 #s += ('%10.4g' * 2) % (targets.shape[0], imgs.shape[-1])
                 #s = ('%10s' * 2 + '%10.2g' + '%10s' + '%10.4g' * 5) % (
                 #    f'{epoch}/{epochs - 1}', f'{i}/{nb}', wall, mem, *mloss, targets.shape[0], imgs.shape[-1])
-                pbar.set_description(s)
+                #pbar.set_description(s)
+                logger.info(s)
 
                 # Plot
                 if plots and ni < 3:
@@ -548,10 +552,12 @@ def main(opt):
         ckpt = opt.resume if isinstance(opt.resume, str) else get_latest_run()  # specified or most recent path
         assert os.path.isfile(ckpt), f'ERROR: --resume checkpoint {ckpt} does not exist'
         # allow --epochs to modify epochs from opt.yaml
+        print("original opt.epochs:", opt.epochs)
         epochs = opt.epochs
         with open(Path(ckpt).parent.parent / 'opt.yaml') as f:
             opt = argparse.Namespace(**yaml.safe_load(f))  # replace
         opt.finished_epochs, opt.epochs = opt.epochs, epochs
+        print("finished_epochs from opt.yaml:", opt.finished_epochs)
         opt.cfg, opt.weights, opt.resume = '', ckpt, True  # reinstate
         logger.info('Resuming training from %s' % ckpt)
     else:
