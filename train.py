@@ -53,7 +53,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
 
     finished_epochs = opt.finished_epochs if hasattr(opt, 'finished_epochs') else None
 
-    #print("logging.root.level:", logging.root.level)
+    print("logging.root.level:", logging.root.level)
     print("logging.root.handlers:", logging.root.handlers)
     #print("logging.lastResort:", logging.lastResort)
     #if logging.root.level > 20: 
@@ -61,6 +61,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
     if (len(logging.root.handlers) == 1) and hasattr(logging.root.handlers[0], 'baseFilename'):
         # Logging to /tmp/kaggle.log is fine, but we also need stdout!
         logger.addHandler(logging.StreamHandler(sys.stdout))
+    print("logger.handlers:", logger.handlers)
 
     # Directories
     save_dir = Path(save_dir)
@@ -140,7 +141,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
             v.requires_grad = False
 
     # Optimizer
-    nbs = 64  # nominal batch size
+    nbs = 32  # nominal batch size
     accumulate = max(round(nbs / batch_size), 1)  # accumulate loss before optimizing
     hyp['weight_decay'] *= batch_size * accumulate / nbs  # scale weight_decay
     logger.info(f"Scaled weight_decay = {hyp['weight_decay']}")
@@ -166,11 +167,15 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
 
     # Scheduler https://arxiv.org/pdf/1812.01187.pdf
     # https://pytorch.org/docs/stable/_modules/torch/optim/lr_scheduler.html#OneCycleLR
+    batchwise = True
     if opt.linear_lr:
         lf = lambda x: (1 - x / (epochs - 1)) * (1.0 - hyp['lrf']) + hyp['lrf']  # linear
     else:
-        lf = one_cycle(1, hyp['lrf'], epochs)  # cosine 1->hyp['lrf']
-    scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
+        # Original Version (steps already in warmup):
+        #lf = one_cycle(1, hyp['lrf'], epochs)  # cosine 1->hyp['lrf']
+        # Version A: step scheduler epoch-wise
+        lf = one_cycle(1, hyp['lrf'], epochs - hyp['warmup_epochs'])  # cosine 1->hyp['lrf']
+    if not batchwise: scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
     # plot_lr_scheduler(optimizer, scheduler, epochs)
 
     # EMA
@@ -237,6 +242,13 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
     nb = len(dataloader)  # number of batches
     assert mlc < nc, 'Label class %g exceeds nc=%g in %s. Possible class labels are 0-%g' % (mlc, nc, data, nc - 1)
 
+    # Scheduler Version B: make one_cycle lr scheduler step batch-wise
+    if opt.linear_lr:
+        lf = lambda x: (1 - x / (epochs - 1)) * (1.0 - hyp['lrf']) + hyp['lrf']  # linear
+    else:
+        lf = one_cycle(1, hyp['lrf'], (epochs - hyp['warmup_epochs']) * nb)  # cosine 1->hyp['lrf']
+    if batchwise: scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
+
     # Process 0
     if RANK in [-1, 0]:
         testloader = create_dataloader(test_path, imgsz_test, batch_size // WORLD_SIZE * 2, gs, single_cls,
@@ -278,17 +290,23 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
 
     # Start training
     t0 = time.time()
-    nw = max(round(hyp['warmup_epochs'] * nb), 1000)  # number of warmup iterations, max(3 epochs, 1k iterations)
+    last_opt_step = -1
+    #nw = max(round(hyp['warmup_epochs'] * nb), 1000)  # number of warmup iterations, max(3 epochs, 1k iterations)
     # nw = min(nw, (epochs - start_epoch) / 2 * nb)  # limit warmup to < 1/2 of training
+    nw = round(hyp['warmup_epochs'] * nb)
     maps = np.zeros(nc)  # mAP per class
     results = (0, 0, 0, 0, 0, 0, 0)  # P, R, mAP@.5, mAP@.5-.95, val_loss(box, obj, cls)
-    scheduler.last_epoch = start_epoch - 1  # do not move
+    # Version A: step scheduler epoch-wise
+    if not batchwise: scheduler.last_epoch = start_epoch - 1  # do not move
+    # Version B: step scheduler batch-wise
+    if batchwise: scheduler.last_epoch = start_epoch * nb - 1
     scaler = amp.GradScaler(enabled=cuda)
     compute_loss = ComputeLoss(model)  # init loss class
     logger.info(f'Image sizes {imgsz} train, {imgsz_test} test\n'
                 f'Using {dataloader.num_workers} dataloader workers\n'
                 f'Logging results to {save_dir}\n'
                 f'Starting training for {epochs} epochs...')
+    lrs, lrs_scheduler_lrs, scheduler_lrs = [], [], []
     for epoch in range(start_epoch, epochs):  # epoch ------------------------------------------------------------------
         epoch_start = time.time()
         model.train()
@@ -331,9 +349,13 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                 xi = [0, nw]  # x interp
                 # model.gr = np.interp(ni, xi, [0.0, 1.0])  # iou loss ratio (obj_loss = 1.0 or iou)
                 accumulate = max(1, np.interp(ni, xi, [1, nbs / batch_size]).round())
+                # ramps up accumulate from 1 to 64/bs during warmup
+                assert accumulate == np.interp(ni, xi, [1, nbs / batch_size]).round() # check: max() obsolete?
                 for j, x in enumerate(optimizer.param_groups):
                     # bias lr falls from 0.1 to lr0, all other lrs rise from 0.0 to lr0
-                    x['lr'] = np.interp(ni, xi, [hyp['warmup_bias_lr'] if j == 2 else 0.0, x['initial_lr'] * lf(epoch)])
+                    ### bug???
+                    #x['lr'] = np.interp(ni, xi, [hyp['warmup_bias_lr'] if j == 2 else 0.0, x['initial_lr'] * lf(epoch)])
+                    x['lr'] = np.interp(ni, xi, [hyp['warmup_bias_lr'] if j == 2 else 0.0, x['initial_lr']])
                     if 'momentum' in x:
                         x['momentum'] = np.interp(ni, xi, [hyp['warmup_momentum'], hyp['momentum']])
 
@@ -358,12 +380,20 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
             scaler.scale(loss).backward()
 
             # Optimize
-            if ni % accumulate == 0:
+            #if ni % accumulate == 0:   ### BUG: does not work with variable `accumulate`!!!
+            if ni - last_opt_step >= accumulate:
                 scaler.step(optimizer)  # optimizer.step
                 scaler.update()
                 optimizer.zero_grad()
                 if ema:
                     ema.update(model)
+                last_opt_step = ni
+                # log lrs and ni=index (during warmup, accumulate is not constant, see Warmup above)
+                lrs.append([ni] + [x['lr'] for x in optimizer.param_groups])
+                lrs_scheduler_lrs.append([ni] + [x['lr'] * y for x, y, in zip(optimizer.param_groups, scheduler.get_last_lr())])
+                scheduler_lrs.append([ni] + [x in scheduler.get_last_lr()])
+            # Version B: step scheduler batchwise
+            if (ni > nw) and batchwise: scheduler.step()
 
             # Print
             if RANK in [-1, 0] and i % max(int(nb / 10), 1) == 0:
@@ -376,11 +406,16 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                 s += '%10s' % f'{i}/{nb}'
                 s += '%10.2f' % wall
                 s += ''.join(f"{pg['lr']:9.1e}" for pg in optimizer.param_groups)
+                s += f'  {accumulate}'
+                #s += f'  {ni % accumulate == 0}'
+                s += f'  {last_opt_step == ni}'
                 #s += ('%10.4g' * 2) % (targets.shape[0], imgs.shape[-1])
                 #s = ('%10s' * 2 + '%10.2g' + '%10s' + '%10.4g' * 5) % (
                 #    f'{epoch}/{epochs - 1}', f'{i}/{nb}', wall, mem, *mloss, targets.shape[0], imgs.shape[-1])
                 #pbar.set_description(s)
                 logger.info(s)
+                #print("scheduler.get_lr:", scheduler.get_last_lr()) 
+                # bullshit: same for all pgs, varies around lr0, const over epoch
 
                 # Plot
                 if plots and ni < 3:
@@ -399,7 +434,9 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
 
         # Scheduler
         lr = [x['lr'] for x in optimizer.param_groups]  # for loggers
-        scheduler.step()
+        # Version A: step scheduler epoch-wise
+        if epoch + 1 >= hyp['warmup_epochs'] and not batchwise:
+            scheduler.step()  # one_cylce starts after warmup
 
         # DDP process 0 or single-GPU
         if RANK in [-1, 0]:
@@ -497,6 +534,9 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                                               name='run_' + wandb_logger.wandb_run.id + '_model',
                                               aliases=['latest', 'best', 'stripped'])
         wandb_logger.finish_run()
+        np.savetxt(save_dir/'lrs.csv', np.array(lrs), delimiter=',')
+        np.savetxt(save_dir/'lrs_scheduler_lrs.csv', np.array(lrs_scheduler_lrs), delimiter=',')
+        np.savetxt(save_dir/'scheduler_lrs.csv', np.array(scheduler_lrs), delimiter=',')
 
     torch.cuda.empty_cache()
     return results
