@@ -53,6 +53,31 @@ LOCAL_RANK = int(os.getenv('LOCAL_RANK', -1))  # https://pytorch.org/docs/stable
 RANK = int(os.getenv('RANK', -1))
 WORLD_SIZE = int(os.getenv('WORLD_SIZE', 1))
 
+
+def get_step_condition(nw, accumulate):
+    "Supports gradient accumulation and warmup for `nw` iterations"
+    nw, accumulate = int(nw), int(accumulate)
+    
+    def acc(ni):
+        "Ramp up number of accumulated grads from 1 to `accumulate`"
+        return int(1 + (accumulate - 1) / nw * ni)
+    
+    warmup_steps, ni = [], nw - 1
+    while ni >= 0:
+        warmup_steps.append(ni)
+        ni -= acc(ni)
+    warmup_steps = set(warmup_steps)
+    
+    def step_condition(ni):
+        "Return whether optimizer.step() is to be called in iteration `ni`"
+        nonlocal nw, accumulate, warmup_steps
+        i = ni - nw
+        if (i >= 0) and ((i + 1) % accumulate == 0): return True
+        return ni in warmup_steps
+    
+    return step_condition
+
+
 def train(hyp,  # path/to/hyp.yaml or hyp dictionary
           opt,
           device,
@@ -119,7 +144,6 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
             data_dict = wandb_logger.data_dict
             weights, epochs, hyp = opt.weights, opt.epochs, opt.hyp  # may update weights, epochs if resuming
 
-    nc = 1 if single_cls else int(data_dict['nc'])  # number of classes
     names = ['item'] if single_cls and len(data_dict['names']) != 1 else data_dict['names']  # class names
     assert len(names) == nc, '%g names found for nc=%g dataset in %s' % (len(names), nc, data)  # check
     is_coco = data.endswith('coco.yaml') and nc == 80  # COCO dataset
@@ -153,7 +177,9 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
 
     # Optimizer
     nbs = 64  # nominal batch size
-    accumulate = max(round(nbs / batch_size), 1)  # accumulate loss before optimizing
+    accumulate = max(int(round(nbs / batch_size)), 1)  # accumulate loss before optimizing
+    nw = round(hyp['warmup_epochs'] * nb)  # number of warmup iterations
+    do_step = get_step_condition(nw, accumulate)
     hyp['weight_decay'] *= batch_size * accumulate / nbs  # scale weight_decay
     logger.info(f"Scaled weight_decay = {hyp['weight_decay']}")
 
@@ -301,10 +327,6 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
 
     # Start training
     t0 = time.time()
-    last_opt_step = -1
-    #nw = max(round(hyp['warmup_epochs'] * nb), 1000)  # number of warmup iterations, max(3 epochs, 1k iterations)
-    # nw = min(nw, (epochs - start_epoch) / 2 * nb)  # limit warmup to < 1/2 of training
-    nw = round(hyp['warmup_epochs'] * nb)
     maps = np.zeros(nc)  # mAP per class
     results = (0, 0, 0, 0, 0, 0, 0)  # P, R, mAP@.5, mAP@.5-.95, val_loss(box, obj, cls)
     # Version A: step scheduler epoch-wise
@@ -317,7 +339,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                 f'Using {dataloader.num_workers} dataloader workers\n'
                 f'Logging results to {save_dir}\n'
                 f'Starting training for {epochs} epochs...')
-    lrs, lrs_scheduler_lrs, scheduler_lrs = [], [], []
+    lrs = []
     for epoch in range(start_epoch, epochs):  # epoch ------------------------------------------------------------------
         epoch_start = time.time()
         model.train()
@@ -392,17 +414,15 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
 
             # Optimize
             #if ni % accumulate == 0:   ### BUG: does not work with variable `accumulate`!!!
-            if ni - last_opt_step >= accumulate:
+            if do_step(ni):
                 scaler.step(optimizer)  # optimizer.step
                 scaler.update()
                 optimizer.zero_grad()
                 if ema:
                     ema.update(model)
-                last_opt_step = ni
                 # log lrs and ni=index (during warmup, accumulate is not constant, see Warmup above)
                 lrs.append([ni] + [x['lr'] for x in optimizer.param_groups])
-                lrs_scheduler_lrs.append([ni] + [x['lr'] * y for x, y, in zip(optimizer.param_groups, scheduler.get_last_lr())])
-                scheduler_lrs.append([ni] + [x in scheduler.get_last_lr()])
+
             # Version B: step scheduler batchwise
             if (ni > nw) and batchwise: scheduler.step()
 
@@ -417,9 +437,9 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                 s += '%10s' % f'{i}/{nb}'
                 s += '%10.2f' % wall
                 s += ''.join(f"{pg['lr']:9.1e}" for pg in optimizer.param_groups)
-                s += f'  {accumulate}'
+                #s += f'  {accumulate}'
                 #s += f'  {ni % accumulate == 0}'
-                s += f'  {last_opt_step == ni}'
+                #s += f'  {last_opt_step == ni}'
                 #s += ('%10.4g' * 2) % (targets.shape[0], imgs.shape[-1])
                 #s = ('%10s' * 2 + '%10.2g' + '%10s' + '%10.4g' * 5) % (
                 #    f'{epoch}/{epochs - 1}', f'{i}/{nb}', wall, mem, *mloss, targets.shape[0], imgs.shape[-1])
@@ -546,8 +566,6 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                                               aliases=['latest', 'best', 'stripped'])
         wandb_logger.finish_run()
         np.savetxt(save_dir/'lrs.csv', np.array(lrs), delimiter=',')
-        np.savetxt(save_dir/'lrs_scheduler_lrs.csv', np.array(lrs_scheduler_lrs), delimiter=',')
-        np.savetxt(save_dir/'scheduler_lrs.csv', np.array(scheduler_lrs), delimiter=',')
 
     torch.cuda.empty_cache()
     return results
