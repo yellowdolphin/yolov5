@@ -7,7 +7,6 @@ Usage:
 import argparse
 import logging
 import math
-import sys
 import os
 import random
 import sys
@@ -29,7 +28,6 @@ from torch.cuda import amp
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-#from fastprogress import fastprogress
 
 FILE = Path(__file__).absolute()
 sys.path.append(FILE.parents[0].as_posix())  # add yolov5/ to path
@@ -86,7 +84,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
         opt.save_dir, opt.epochs, opt.batch_size, opt.weights, opt.single_cls, opt.evolve, opt.data, opt.cfg, \
         opt.resume, opt.notest, opt.nosave, opt.workers
 
-    finished_epochs = opt.finished_epochs if hasattr(opt, 'finished_epochs') else None
+    finished_epochs = opt.finished_epochs if hasattr(opt, 'finished_epochs') else None  # allow continue finished trains
 
     print("logging.root.level:", logging.root.level)
     print("logging.root.handlers:", logging.root.handlers)
@@ -144,6 +142,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
             data_dict = wandb_logger.data_dict
             weights, epochs, hyp = opt.weights, opt.epochs, opt.hyp  # may update weights, epochs if resuming
 
+    nc = 1 if single_cls else int(data_dict['nc'])  # number of classes
     names = ['item'] if single_cls and len(data_dict['names']) != 1 else data_dict['names']  # class names
     assert len(names) == nc, '%g names found for nc=%g dataset in %s' % (len(names), nc, data)  # check
     is_coco = data.endswith('coco.yaml') and nc == 80  # COCO dataset
@@ -381,12 +380,9 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
             if ni <= nw:
                 xi = [0, nw]  # x interp
                 # model.gr = np.interp(ni, xi, [0.0, 1.0])  # iou loss ratio (obj_loss = 1.0 or iou)
-                accumulate = max(1, np.interp(ni, xi, [1, nbs / batch_size]).round())
-                # ramps up accumulate from 1 to 64/bs during warmup
-                assert accumulate == np.interp(ni, xi, [1, nbs / batch_size]).round() # check: max() obsolete?
                 for j, x in enumerate(optimizer.param_groups):
                     # bias lr falls from 0.1 to lr0, all other lrs rise from 0.0 to lr0
-                    ### bug???
+                    ### bug, include in PR with other scheduler issues
                     #x['lr'] = np.interp(ni, xi, [hyp['warmup_bias_lr'] if j == 2 else 0.0, x['initial_lr'] * lf(epoch)])
                     x['lr'] = np.interp(ni, xi, [hyp['warmup_bias_lr'] if j == 2 else 0.0, x['initial_lr']])
                     if 'momentum' in x:
@@ -413,7 +409,6 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
             scaler.scale(loss).backward()
 
             # Optimize
-            #if ni % accumulate == 0:   ### BUG: does not work with variable `accumulate`!!!
             if do_step(ni):
                 scaler.step(optimizer)  # optimizer.step
                 scaler.update()
