@@ -437,9 +437,6 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                 s += '%10s' % f'{i}/{nb}'
                 s += '%10.2f' % wall
                 s += ''.join(f"{pg['lr']:9.1e}" for pg in optimizer.param_groups)
-                #s += f'  {accumulate}'
-                #s += f'  {ni % accumulate == 0}'
-                #s += f'  {last_opt_step == ni}'
                 #s += ('%10.4g' * 2) % (targets.shape[0], imgs.shape[-1])
                 #s = ('%10s' * 2 + '%10.2g' + '%10s' + '%10.4g' * 5) % (
                 #    f'{epoch}/{epochs - 1}', f'{i}/{nb}', wall, mem, *mloss, targets.shape[0], imgs.shape[-1])
