@@ -222,9 +222,14 @@ def check_file(file):
 
 def check_dataset(data, autodownload=True):
     # Download dataset if not found locally
-    val, s = data.get('val'), data.get('download')
+    path = Path(data.get('path', ''))  # optional 'path' field
+    if path:
+        for k in 'train', 'val', 'test':
+            if data.get(k):  # prepend path
+                data[k] = str(path / data[k]) if isinstance(data[k], str) else [str(path / x) for x in data[k]]
+
+    train, val, test, s = [data.get(x) for x in ('train', 'val', 'test', 'download')]
     if val:
-        root = Path(val).parts[0] + os.sep  # unzip directory i.e. '../'
         val = [Path(x).resolve() for x in (val if isinstance(val, list) else [val])]  # val path
         if not all(x.exists() for x in val):
             print('\nWARNING: Dataset not found, nonexistent paths: %s' % [str(x) for x in val if not x.exists()])
@@ -233,12 +238,14 @@ def check_dataset(data, autodownload=True):
                     f = Path(s).name  # filename
                     print(f'Downloading {s} ...')
                     torch.hub.download_url_to_file(s, f)
+                    root = path.parent if 'path' in data else '..'  # unzip directory i.e. '../'
+                    Path(root).mkdir(parents=True, exist_ok=True)  # create root
                     r = os.system(f'unzip -q {f} -d {root} && rm {f}')  # unzip
                 elif s.startswith('bash '):  # bash script
                     print(f'Running {s} ...')
                     r = os.system(s)
                 else:  # python script
-                    r = exec(s)  # return None
+                    r = exec(s, {'yaml': data})  # return None
                 print('Dataset autodownload %s\n' % ('success' if r in (0, None) else 'failure'))  # print result
             else:
                 raise Exception('Dataset not found.')
@@ -258,7 +265,7 @@ def download(url, dir='.', unzip=True, delete=True, curl=False, threads=1):
         if unzip and f.suffix in ('.zip', '.gz'):
             print(f'Unzipping {f}...')
             if f.suffix == '.zip':
-                s = f'unzip -qo {f} -d {dir} && rm {f}'  # unzip -quiet -overwrite
+                s = f'unzip -qo {f} -d {dir}'  # unzip -quiet -overwrite
             elif f.suffix == '.gz':
                 s = f'tar xfz {f} --directory {f.parent}'  # unzip
             if delete:  # delete zip file after unzip
@@ -386,6 +393,18 @@ def xywhn2xyxy(x, w=640, h=640, padw=0, padh=0):
     return y
 
 
+def xyxy2xywhn(x, w=640, h=640, clip=False):
+    # Convert nx4 boxes from [x1, y1, x2, y2] to [x, y, w, h] normalized where xy1=top-left, xy2=bottom-right
+    if clip:
+        clip_coords(x, (h, w))  # warning: inplace clip
+    y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
+    y[:, 0] = ((x[:, 0] + x[:, 2]) / 2) / w  # x center
+    y[:, 1] = ((x[:, 1] + x[:, 3]) / 2) / h  # y center
+    y[:, 2] = (x[:, 2] - x[:, 0]) / w  # width
+    y[:, 3] = (x[:, 3] - x[:, 1]) / h  # height
+    return y
+
+
 def xyn2xy(x, w=640, h=640, padw=0, padh=0):
     # Convert normalized segments into pixel segments, shape (n,2)
     y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
@@ -438,10 +457,16 @@ def scale_coords(img1_shape, coords, img0_shape, ratio_pad=None):
 
 def clip_coords(boxes, img_shape):
     # Clip bounding xyxy bounding boxes to image shape (height, width)
-    boxes[:, 0].clamp_(0, img_shape[1])  # x1
-    boxes[:, 1].clamp_(0, img_shape[0])  # y1
-    boxes[:, 2].clamp_(0, img_shape[1])  # x2
-    boxes[:, 3].clamp_(0, img_shape[0])  # y2
+    if isinstance(boxes, torch.Tensor):
+        boxes[:, 0].clamp_(0, img_shape[1])  # x1
+        boxes[:, 1].clamp_(0, img_shape[0])  # y1
+        boxes[:, 2].clamp_(0, img_shape[1])  # x2
+        boxes[:, 3].clamp_(0, img_shape[0])  # y2
+    else:  # np.array
+        boxes[:, 0].clip(0, img_shape[1], out=boxes[:, 0])  # x1
+        boxes[:, 1].clip(0, img_shape[0], out=boxes[:, 1])  # y1
+        boxes[:, 2].clip(0, img_shape[1], out=boxes[:, 2])  # x2
+        boxes[:, 3].clip(0, img_shape[0], out=boxes[:, 3])  # y2
 
 
 def bbox_iou(box1, box2, x1y1x2y2=True, GIoU=False, DIoU=False, CIoU=False, eps=1e-7):
