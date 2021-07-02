@@ -6,7 +6,6 @@ Usage:
 
 import argparse
 import logging
-import math
 import os
 import random
 import sys
@@ -16,6 +15,7 @@ from copy import deepcopy
 from pathlib import Path
 from threading import Thread
 
+import math
 import numpy as np
 import torch.distributed as dist
 import torch.nn as nn
@@ -51,30 +51,6 @@ logger = logging.getLogger(__name__)  # child of logging.root, no own handler. P
 LOCAL_RANK = int(os.getenv('LOCAL_RANK', -1))  # https://pytorch.org/docs/stable/elastic/run.html
 RANK = int(os.getenv('RANK', -1))
 WORLD_SIZE = int(os.getenv('WORLD_SIZE', 1))
-
-
-def get_step_condition(nw, accumulate):
-    "Supports gradient accumulation and warmup for `nw` iterations"
-    nw, accumulate = int(nw), int(accumulate)
-    
-    def acc(ni):
-        "Ramp up number of accumulated grads from 1 to `accumulate`"
-        return int(1 + (accumulate - 1) / nw * ni)
-    
-    warmup_steps, ni = [], nw - 1
-    while ni >= 0:
-        warmup_steps.append(ni)
-        ni -= acc(ni)
-    warmup_steps = set(warmup_steps)
-    
-    def step_condition(ni):
-        "Return whether optimizer.step() is to be called in iteration `ni`"
-        nonlocal nw, accumulate, warmup_steps
-        i = ni - nw
-        if (i >= 0) and ((i + 1) % accumulate == 0): return True
-        return ni in warmup_steps
-    
-    return step_condition
 
 
 def train(hyp,  # path/to/hyp.yaml or hyp dictionary
@@ -323,8 +299,9 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
 
     # Start training
     t0 = time.time()
+    #nw = max(round(hyp['warmup_epochs'] * nb), 1000)  # number of warmup iterations, max(3 epochs, 1k iterations)
     nw = round(hyp['warmup_epochs'] * nb)  # number of warmup iterations
-    do_step = get_step_condition(nw, accumulate)
+    last_opt_step = -1
     maps = np.zeros(nc)  # mAP per class
     results = (0, 0, 0, 0, 0, 0, 0)  # P, R, mAP@.5, mAP@.5-.95, val_loss(box, obj, cls)
     # Version A: step scheduler epoch-wise
@@ -408,12 +385,14 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
             scaler.scale(loss).backward()
 
             # Optimize
-            if do_step(ni):
+            if ni - last_opt_step >= accumulate:
                 scaler.step(optimizer)  # optimizer.step
                 scaler.update()
                 optimizer.zero_grad()
                 if ema:
                     ema.update(model)
+                last_opt_step = ni
+
                 # log lrs and ni=index (during warmup, accumulate is not constant, see Warmup above)
                 lrs.append([ni] + [x['lr'] for x in optimizer.param_groups])
 
@@ -678,7 +657,8 @@ def main(opt):
                 'flipud': (1, 0.0, 1.0),  # image flip up-down (probability)
                 'fliplr': (0, 0.0, 1.0),  # image flip left-right (probability)
                 'mosaic': (1, 0.0, 1.0),  # image mixup (probability)
-                'mixup': (1, 0.0, 1.0)}  # image mixup (probability)
+                'mixup': (1, 0.0, 1.0),  # image mixup (probability)
+                'copy_paste': (1, 0.0, 1.0)}  # segment copy-paste (probability)
 
         with open(opt.hyp) as f:
             hyp = yaml.safe_load(f)  # load hyps dict
