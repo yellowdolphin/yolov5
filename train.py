@@ -47,7 +47,7 @@ from utils.torch_utils import ModelEMA, select_device, intersect_dicts, torch_di
 from utils.wandb_logging.wandb_utils import WandbLogger, check_wandb_resume
 from utils.metrics import fitness
 
-logger = logging.getLogger(__name__)  # child of logging.root, no own handler. Purpose?
+logger = logging.getLogger(__name__)  # child of logging.root, no own handler, just for "results.txt".
 LOCAL_RANK = int(os.getenv('LOCAL_RANK', -1))  # https://pytorch.org/docs/stable/elastic/run.html
 RANK = int(os.getenv('RANK', -1))
 WORLD_SIZE = int(os.getenv('WORLD_SIZE', 1))
@@ -63,15 +63,15 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
 
     finished_epochs = opt.finished_epochs if hasattr(opt, 'finished_epochs') else None  # allow continue finished trains
 
-    print("logging.root.level:", logging.root.level)
-    print("logging.root.handlers:", logging.root.handlers)
+    print("logging.root.level:", logging.root.level)        # 20
+    print("logging.root.handlers:", logging.root.handlers)  # kaggle.log (level 0)
     #print("logging.lastResort:", logging.lastResort)
     #if logging.root.level > 20: 
     #    logging.root.setLevel(logging.INFO)
     if (len(logging.root.handlers) == 1) and hasattr(logging.root.handlers[0], 'baseFilename'):
-        # Logging to /tmp/kaggle.log is fine, but we also need stdout!
+        # Logging to /tmp/kaggle.log is fine, but we also want some of the info on stdout!
         logger.addHandler(logging.StreamHandler(sys.stdout))
-    print("logger.handlers:", logger.handlers)
+    print("logger.handlers:", logger.handlers)              # stdout, level 0
 
     # Directories
     save_dir = Path(save_dir)
@@ -232,6 +232,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
     gs = max(int(model.stride.max()), 32)  # grid size (max stride)
     nl = model.model[-1].nl  # number of detection layers (used for scaling hyp['obj'])
     imgsz, imgsz_test = [check_img_size(x, gs) for x in opt.img_size]  # verify imgsz are gs-multiples
+    assert imgsz >= 64, 'minimum image size is (64, 64)'
 
     # DP mode
     if cuda and RANK == -1 and torch.cuda.device_count() > 1:
@@ -304,10 +305,10 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
     last_opt_step = -1
     maps = np.zeros(nc)  # mAP per class
     results = (0, 0, 0, 0, 0, 0, 0)  # P, R, mAP@.5, mAP@.5-.95, val_loss(box, obj, cls)
-    # Version A: step scheduler epoch-wise
-    if not batchwise: scheduler.last_epoch = start_epoch - 1  # do not move
-    # Version B: step scheduler batch-wise
-    if batchwise: scheduler.last_epoch = start_epoch * nb - 1
+    # Version A: step scheduler epoch-wise (scheduler not stepped during warmup)
+    if not batchwise: scheduler.last_epoch = max(0, start_epoch - hyp['warmup_epochs']) - 1  # do not move
+    # Version B: step scheduler batch-wise (scheduler not stepped during warmup)
+    if batchwise: scheduler.last_epoch = max(0, start_epoch - hyp['warmup_epochs']) * nb - 1
     scaler = amp.GradScaler(enabled=cuda)
     compute_loss = ComputeLoss(model)  # init loss class
     logger.info(f'Image sizes {imgsz} train, {imgsz_test} test\n'
@@ -315,6 +316,12 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                 f'Logging results to {save_dir}\n'
                 f'Starting training for {epochs} epochs...')
     lrs = []
+
+    # On kaggle mute logger's new Handler until end of training
+    if logger.handlers: logger.handlers[0].setLevel(logging.WARNING)
+    logging.root.handlers[0].setLevel(logging.WARNING)
+    logging.root.handlers[0].setLevel(0)
+
     for epoch in range(start_epoch, epochs):  # epoch ------------------------------------------------------------------
         epoch_start = time.time()
         model.train()
@@ -342,9 +349,8 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
         if RANK != -1:
             dataloader.sampler.set_epoch(epoch)
         pbar = enumerate(dataloader)
-        logger.propagate = False  # don't log every iter to file
-        logger.info(('\n' + '%10s' * 8) % ('Epoch', 'gpu_mem', 'box', 'obj', 'cls', 'total', 'Iter', 'Wall') + '  Learning rates') 
-                                                                                           #, 'labels', 'img_size'))
+        print(('\n%6s%11s%8s%7s'+'%9s'*4) % ('Epoch', 'Iter', 'Wall', 'GPU', 'box', 'obj', 'cls', 'total') + '  Learning rates')
+        #logger.info(('\n' + '%10s' * 8) % ('Epoch', 'gpu_mem', 'box', 'obj', 'cls', 'total', 'labels', 'img_size'))
         #if RANK in [-1, 0]:
         #    pbar = tqdm(pbar, total=nb)  # progress bar
         optimizer.zero_grad()
@@ -401,22 +407,23 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
 
             # Print
             if RANK in [-1, 0] and i % max(int(nb / 10), 1) == 0:
-                wall = (time.time() - epoch_start) / 60
                 mloss = (mloss * i + loss_items) / (i + 1)  # update mean losses
-                mem = '%.3gG' % (torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0)  # (GB)
-                s = '%10s' % f'{epoch}/{epochs - 1}'
-                s += '%10s' % mem
-                s += ('%10.4g' * len(mloss)) % (*mloss,)
-                s += '%10s' % f'{i}/{nb}'
-                s += '%10.2f' % wall
+                
+                # Customized stdout (replaces tqdm.set_description)
+                mem = torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0  # (GB)
+                wall = (time.time() - epoch_start) / 60
+                s = '%6s' % f'{epoch + 1}/{epochs}'
+                s += '%11s' % f'{i}/{nb}'
+                s += '%8.2f' % wall
+                s += '%6.1fG' % mem
+                s += ('%9.5f' * len(mloss)) % (*mloss,)
                 s += ''.join(f"{pg['lr']:9.1e}" for pg in optimizer.param_groups)
-                #s += ('%10.4g' * 2) % (targets.shape[0], imgs.shape[-1])
-                #s = ('%10s' * 2 + '%10.2g' + '%10s' + '%10.4g' * 5) % (
-                #    f'{epoch}/{epochs - 1}', f'{i}/{nb}', wall, mem, *mloss, targets.shape[0], imgs.shape[-1])
+                print(s)
+
+                # Still needed for results.txt:
+                s = ('%10s' * 2 + '%10.4g' * 6) % (
+                    f'{epoch}/{epochs - 1}', mem, *mloss, targets.shape[0], imgs.shape[-1])
                 #pbar.set_description(s)
-                logger.info(s)
-                #print("scheduler.get_lr:", scheduler.get_last_lr()) 
-                # bullshit: same for all pgs, varies around lr0, const over epoch
 
                 # Plot
                 if plots and ni < 3:
@@ -502,6 +509,10 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
 
         # end epoch ----------------------------------------------------------------------------------------------------
     # end training -----------------------------------------------------------------------------------------------------
+
+    # On kaggle set logger's new Handler back to INFO
+    if logger.handlers: logger.handlers[0].setLevel(logging.INFO)
+
     if RANK in [-1, 0]:
         logger.info(f'{epoch - start_epoch + 1} epochs completed in {(time.time() - t0) / 3600:.3f} hours.\n')
         if plots:
