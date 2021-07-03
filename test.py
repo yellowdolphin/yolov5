@@ -244,7 +244,7 @@ def run(data,
         nt = torch.zeros(1)
 
     # Print results
-    pf = '%20s' + '%10i' * 2 + '%10.3g' * 4  # print format
+    pf = '%20s' + '%10i' * 2 + '%10.6f' * 4  # print format
     print(pf % ('all', seen, nt.sum(), mp, mr, map50, map))
 
     # Print results per class

@@ -438,7 +438,6 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                                                   save_dir.glob('train*.jpg') if x.exists()]})
 
             # end batch ------------------------------------------------------------------------------------------------
-            logger.propagate = True
 
         # Scheduler
         lr = [x['lr'] for x in optimizer.param_groups]  # for loggers
