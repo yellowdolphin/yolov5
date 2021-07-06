@@ -421,6 +421,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                 print(s)
 
                 # Still needed for results.txt:
+                mem = '%.3gG' % mem
                 s = ('%10s' * 2 + '%10.4g' * 6) % (
                     f'{epoch}/{epochs - 1}', mem, *mloss, targets.shape[0], imgs.shape[-1])
                 #pbar.set_description(s)
