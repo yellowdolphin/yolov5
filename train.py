@@ -456,6 +456,8 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                 results, maps, _ = test.run(data_dict,
                                             batch_size=batch_size // WORLD_SIZE * 2,
                                             imgsz=imgsz_test,
+                                            conf_thres=1e-5,
+                                            iou_thres=0.6,
                                             model=ema.ema,
                                             single_cls=single_cls,
                                             dataloader=testloader,
@@ -523,6 +525,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                                               if (save_dir / f).exists()]})
 
         if not evolve:
+            # Print metrics, json for submission to original COCO benchmark (skip otherwise)
             if is_coco:  # COCO dataset
                 for m in [last, best] if best.exists() else [last]:  # speed, mAP tests
                     results, _, _ = test.run(data_dict,
@@ -653,7 +656,7 @@ def main(opt):
                 'cls_pw': (1, 0.5, 2.0),  # cls BCELoss positive_weight
                 'obj': (1, 0.2, 4.0),  # obj loss gain (scale with pixels)
                 'obj_pw': (1, 0.5, 2.0),  # obj BCELoss positive_weight
-                'iou_t': (0, 0.1, 0.7),  # IoU training threshold
+                'iou_t': (0, 0.1, 0.7),  # IoU training threshold (currently not used)
                 'anchor_t': (1, 2.0, 8.0),  # anchor-multiple threshold
                 'anchors': (2, 2.0, 10.0),  # anchors per output grid (0 to ignore)
                 'fl_gamma': (0, 0.0, 2.0),  # focal loss gamma (efficientDet default gamma=1.5)
