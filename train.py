@@ -456,8 +456,8 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                 results, maps, _ = test.run(data_dict,
                                             batch_size=batch_size // WORLD_SIZE * 2,
                                             imgsz=imgsz_test,
-                                            conf_thres=1e-5,
-                                            iou_thres=0.6,
+                                            conf_thres=opt.val_conf_thres,
+                                            iou_thres=opt.val_iou_thres,
                                             model=ema.ema,
                                             single_cls=single_cls,
                                             dataloader=testloader,
@@ -589,6 +589,8 @@ def parse_opt(known=False):
     parser.add_argument('--save_period', type=int, default=-1, help='Log model after every "save_period" epoch')
     parser.add_argument('--artifact_alias', type=str, default="latest", help='version of dataset artifact to be used')
     parser.add_argument('--local_rank', type=int, default=-1, help='DDP parameter, do not modify')
+    parser.add_argument('--val_iou_thres', type=float, default=0.6, help='IoU threshold for validation mAP')
+    parser.add_argument('--val_conf_thres', type=float, default=0.001, help='Confidence threshold for validation mAP')
     opt = parser.parse_known_args()[0] if known else parser.parse_args()
     return opt
 
