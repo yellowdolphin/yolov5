@@ -49,7 +49,7 @@ from utils.torch_utils import ModelEMA, select_device, intersect_dicts, torch_di
 from utils.wandb_logging.wandb_utils import WandbLogger, check_wandb_resume
 from utils.metrics import fitness
 
-cu_version = run('nvcc --version'.split(), capture_output=True).stdout.decode('utf-8')
+cu_version = run('nvcc --version', shell=True, capture_output=True, encoding='utf-8').stdout
 if 'V11.0' in cu_version:
     print("disabling cudnn, see https://github.com/pytorch/pytorch/issues/47908")
     torch.backends.cudnn.enabled = False
