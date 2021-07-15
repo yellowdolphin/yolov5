@@ -8,6 +8,7 @@ import argparse
 import sys
 import time
 from pathlib import Path
+from subprocess import run
 
 import cv2
 import torch
@@ -23,6 +24,10 @@ from utils.general import check_img_size, check_requirements, check_imshow, colo
 from utils.plots import colors, plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized
 
+cu_version = run('nvcc --version'.split(), capture_output=True).stdout.decode('utf-8')
+if 'V11.0' in cu_version:
+    print("disabling cudnn, see https://github.com/pytorch/pytorch/issues/47908")
+    cudnn.enabled = False
 
 @torch.no_grad()
 def run(weights='yolov5s.pt',  # model.pt path(s)

@@ -14,6 +14,7 @@ import warnings
 from copy import deepcopy
 from pathlib import Path
 from threading import Thread
+from subprocess import run
 
 import math
 import numpy as np
@@ -24,6 +25,7 @@ import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 import torch.utils.data
 import yaml
+import torch
 from torch.cuda import amp
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.tensorboard import SummaryWriter
@@ -46,6 +48,11 @@ from utils.plots import plot_images, plot_labels, plot_results, plot_evolution
 from utils.torch_utils import ModelEMA, select_device, intersect_dicts, torch_distributed_zero_first, de_parallel
 from utils.wandb_logging.wandb_utils import WandbLogger, check_wandb_resume
 from utils.metrics import fitness
+
+cu_version = run('nvcc --version'.split(), capture_output=True).stdout.decode('utf-8')
+if 'V11.0' in cu_version:
+    print("disabling cudnn, see https://github.com/pytorch/pytorch/issues/47908")
+    torch.backends.cudnn.enabled = False
 
 logger = logging.getLogger(__name__)  # child of logging.root, no own handler, just for "results.txt".
 LOCAL_RANK = int(os.getenv('LOCAL_RANK', -1))  # https://pytorch.org/docs/stable/elastic/run.html
