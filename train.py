@@ -618,7 +618,13 @@ def main(opt):
         print("original opt.epochs:", opt.epochs)
         epochs = opt.epochs
         with open(Path(ckpt).parent.parent / 'opt.yaml') as f:
-            opt = argparse.Namespace(**yaml.safe_load(f))  # replace
+            # This breaks if opt is changed by a commit and user tries to resume.
+            #opt = argparse.Namespace(**yaml.safe_load(f))  # replace
+            resume_opt = argparse.Namespace(**yaml.safe_load(f))
+            for k, v in vars(resume_opt).items():
+                #if hasattr(opt, k): setattr(opt, k, v)
+                setattr(opt, k, v)   # potentially unsafe but required (e.g. 'save_dir')
+
         opt.finished_epochs, opt.epochs = opt.epochs, epochs
         print("finished_epochs from opt.yaml:", opt.finished_epochs)
         opt.cfg, opt.weights, opt.resume = '', ckpt, True  # reinstate
