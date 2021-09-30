@@ -75,8 +75,8 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
     #    logging.root.setLevel(logging.INFO)
     if (len(logging.root.handlers) == 1) and hasattr(logging.root.handlers[0], 'baseFilename'):
         # Logging to /tmp/kaggle.log is fine, but we also want some of the info on stdout!
-        logger.addHandler(logging.StreamHandler(sys.stdout))
-    print("logger.handlers:", logger.handlers)              # stdout, level 0
+        LOGGER.addHandler(logging.StreamHandler(sys.stdout))
+    print("LOGGER.handlers:", LOGGER.handlers)              # stdout, level 0
 
     # Directories
     w = save_dir / 'weights'  # weights dir
@@ -306,7 +306,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
     lrs = []
 
     # On kaggle mute logger's new Handler until end of training
-    if logger.handlers: logger.handlers[0].setLevel(logging.WARNING)
+    if LOGGER.handlers: LOGGER.handlers[0].setLevel(logging.WARNING)
     logging.root.handlers[0].setLevel(logging.WARNING)
     logging.root.handlers[0].setLevel(0)
 
@@ -399,19 +399,19 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                 mloss = (mloss * i + loss_items) / (i + 1)  # update mean losses
                 
                 # Customized stdout (replaces tqdm.set_description)
-                mem = f'{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.3g}G'  # (GB)
+                mem = torch.cuda.memory_reserved() / 1e9 if torch.cuda.is_available() else 0
                 wall = (time.time() - epoch_start) / 60
                 s = '%6s' % f'{epoch + 1}/{epochs}'
                 s += '%11s' % f'{i}/{nb}'
                 s += '%8.2f' % wall
                 s += '%6.1fG' % mem
-                s += ('%9.5f' * len(mloss)) % (*mloss,)
+                s += ('%9.5f' * (len(mloss) + 1)) % (*mloss, mloss.sum())
                 s += ''.join(f"{pg['lr']:9.1e}" for pg in optimizer.param_groups)
                 print(s)
 
                 # Still needed for results.txt:
                 mem = '%.3gG' % mem
-                s = ('%10s' * 2 + '%10.4g' * 6) % (
+                s = ('%10s' * 2 + '%10.4g' * 5) % (
                     f'{epoch}/{epochs - 1}', mem, *mloss, targets.shape[0], imgs.shape[-1])
                 #pbar.set_description(('%10s' * 2 + '%10.4g' * 5) % (
                 #    f'{epoch}/{epochs - 1}', mem, *mloss, targets.shape[0], imgs.shape[-1]))
@@ -448,7 +448,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
 
             # Update best mAP
             fi = fitness(np.array(results).reshape(1, -1))  # weighted combination of [P, R, mAP@.5, mAP@.5-.95]
-            if fi > best_fitness:
+            if fi > best_fitness:                           # weights (utils.metrics): 0, 0,    0.1,        0.9
                 best_fitness = fi
             log_vals = list(mloss) + list(results) + lr
             callbacks.on_fit_epoch_end(log_vals, epoch, best_fitness, fi)
@@ -474,7 +474,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
     # end training -----------------------------------------------------------------------------------------------------
 
     # On kaggle set logger's new Handler back to INFO
-    if logger.handlers: logger.handlers[0].setLevel(logging.INFO)
+    if LOGGER.handlers: LOGGER.handlers[0].setLevel(logging.INFO)
 
     if RANK in [-1, 0]:
         LOGGER.info(f'\n{epoch - start_epoch + 1} epochs completed in {(time.time() - t0) / 3600:.3f} hours.')
