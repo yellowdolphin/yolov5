@@ -482,8 +482,8 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
         epochs = epoch - start_epoch + 1
         wall = time.time() - t0
         LOGGER.info(f'\n{epochs} epochs completed in {wall / 3600:.3f} hours.')
-        LOGGER.info(f'Best epoch, mAP@0.50, mAP, Wall (min/epoch):')
-        LOGGER.info(f'{best_epoch} {best_results[2]:.5f} {best_results[3]:.5f} {wall / 60 / epochs:.2f}')
+        LOGGER.info(f'Best epoch  mAP@0.50     mAP  Wall (min/ep)')
+        LOGGER.info(f'{best_epoch:10}{best_results[2]:10.5f}{best_results[3]:8.5f}{wall / 60 / epochs:15.2f}')
         if not evolve:
             # Print metrics, json for submission to original COCO benchmark (skip otherwise)
             if is_coco:  # COCO dataset
