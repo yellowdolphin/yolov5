@@ -467,6 +467,8 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                 torch.save(ckpt, last)
                 if best_fitness == fi:
                     torch.save(ckpt, best)
+                    print(f'Model fitness improved, wrote checkpoint {best}')
+                    best_epoch, best_results = epoch, np.array(results).reshape(1, -1)
                 del ckpt
                 callbacks.on_model_save(last, epoch, final_epoch, best_fitness, fi)
 
@@ -477,7 +479,11 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
     if LOGGER.handlers: LOGGER.handlers[0].setLevel(logging.INFO)
 
     if RANK in [-1, 0]:
-        LOGGER.info(f'\n{epoch - start_epoch + 1} epochs completed in {(time.time() - t0) / 3600:.3f} hours.')
+        epochs = epoch - start_epoch + 1
+        wall = time.time() - t0
+        LOGGER.info(f'\n{epochs} epochs completed in {wall / 3600:.3f} hours.')
+        LOGGER.info(f'Best epoch, mAP@0.50, mAP, Wall (min/epoch):')
+        LOGGER.info(f'{best_epoch} {best_results[2]:.5f} {best_results[3]:.5f} {wall / 60 / epochs:.2f}')
         if not evolve:
             # Print metrics, json for submission to original COCO benchmark (skip otherwise)
             if is_coco:  # COCO dataset
