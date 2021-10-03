@@ -119,6 +119,7 @@ def random_perspective(im, targets=(), segments=(), hm=None, degrees=10, transla
                        border=(0, 0)):
     # torchvision.transforms.RandomAffine(degrees=(-10, 10), translate=(.1, .1), scale=(.9, 1.1), shear=(-10, 10))
     # targets = [cls, xyxy]
+    print("random_perspective: hm is not None:", hm is not None)
 
     height = im.shape[0] + border[0] * 2  # shape(h,w,c)
     width = im.shape[1] + border[1] * 2
@@ -205,6 +206,7 @@ def random_perspective(im, targets=(), segments=(), hm=None, degrees=10, transla
         targets = targets[i]
         targets[:, 1:5] = new[i]
 
+    print("hm is not None:", hm is not None)
     return im, targets, hm if hm is not None else im, targets
 
 
