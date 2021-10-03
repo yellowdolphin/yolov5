@@ -399,12 +399,12 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
 
                     loss, loss_items = compute_loss(pred, targets.to(device))  # loss scaled by batch_size
                     
-                    logit_loss = 0.5 * criterion(logits, has_box.to(device))
+                    logit_loss = 0.5 * bce_loss(logits, has_box.to(device))
                     
                     seg_out = _sigmoid(seg_out)
                     hms = torch.unsqueeze(hms, 1)
                     hm_weight = 10 * (1 - sigmoid_rampup(epoch, int(0.8 * epochs)))
-                    hm_loss = hm_weight * segLoss(seg_out, hms)
+                    hm_loss = hm_weight * mse_loss(seg_out, hms)
 
                     loss += logit_loss + hm_loss
                 else:
