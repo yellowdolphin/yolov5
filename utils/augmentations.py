@@ -115,7 +115,7 @@ def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleF
     return im, ratio, (dw, dh)
 
 
-def random_perspective(im, targets=(), segments=(), degrees=10, translate=.1, scale=.1, shear=10, perspective=0.0,
+def random_perspective(im, targets=(), segments=(), hm=None, degrees=10, translate=.1, scale=.1, shear=10, perspective=0.0,
                        border=(0, 0)):
     # torchvision.transforms.RandomAffine(degrees=(-10, 10), translate=(.1, .1), scale=(.9, 1.1), shear=(-10, 10))
     # targets = [cls, xyxy]
@@ -156,8 +156,12 @@ def random_perspective(im, targets=(), segments=(), degrees=10, translate=.1, sc
     if (border[0] != 0) or (border[1] != 0) or (M != np.eye(3)).any():  # image changed
         if perspective:
             im = cv2.warpPerspective(im, M, dsize=(width, height), borderValue=(114, 114, 114))
+            if hm is not None:
+                hm = cv2.warpPerspective(hm, M, dsize=(width, height), borderValue=(0))
         else:  # affine
             im = cv2.warpAffine(im, M[:2], dsize=(width, height), borderValue=(114, 114, 114))
+            if hm is not None:
+                hm = cv2.warpAffine(hm, M[:2], dsize=(width, height), borderValue=(0))
 
     # Visualize
     # import matplotlib.pyplot as plt
@@ -201,7 +205,7 @@ def random_perspective(im, targets=(), segments=(), degrees=10, translate=.1, sc
         targets = targets[i]
         targets[:, 1:5] = new[i]
 
-    return im, targets
+    return img, targets, hm if hm is not None else im, targets
 
 
 def copy_paste(im, labels, segments, p=0.5):

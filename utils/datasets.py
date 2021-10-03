@@ -528,7 +528,11 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         mosaic = self.mosaic and random.random() < hyp['mosaic']
         if mosaic:
             # Load mosaic
-            img, labels = load_mosaic(self, index)
+            if hyp.aux_loss == 'centernet':
+                img, labels, hm = load_mosaic(self, index)
+                assert hyp['mixup'] == 0, 'mixup not implemented for aux_loss="centernet"'
+            else:
+                img, labels = load_mosaic(self, index)
             shapes = None
 
             # MixUp augmentation
@@ -545,16 +549,27 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
             shapes = (h0, w0), ((h / h0, w / w0), pad)  # for COCO mAP rescaling
 
             labels = self.labels[index].copy()
+            if hyp.aux_loss == 'centernet':
+                hm = load_heatmap(labels, w, h)
             if labels.size:  # normalized xywh to pixel xyxy format
                 labels[:, 1:] = xywhn2xyxy(labels[:, 1:], ratio[0] * w, ratio[1] * h, padw=pad[0], padh=pad[1])
 
             if self.augment:
-                img, labels = random_perspective(img, labels,
-                                                 degrees=hyp['degrees'],
-                                                 translate=hyp['translate'],
-                                                 scale=hyp['scale'],
-                                                 shear=hyp['shear'],
-                                                 perspective=hyp['perspective'])
+                if hyp.aux_loss == 'centernet':
+                    img, labels, hm = random_perspective(img, labels,
+                                                     hm=hm,
+                                                     degrees=hyp['degrees'],
+                                                     translate=hyp['translate'],
+                                                     scale=hyp['scale'],
+                                                     shear=hyp['shear'],
+                                                     perspective=hyp['perspective'])
+                else:
+                    img, labels = random_perspective(img, labels,
+                                                     degrees=hyp['degrees'],
+                                                     translate=hyp['translate'],
+                                                     scale=hyp['scale'],
+                                                     shear=hyp['shear'],
+                                                     perspective=hyp['perspective'])
 
         nl = len(labels)  # number of labels
         if nl:
@@ -562,7 +577,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
 
         if self.augment:
             # Albumentations
-            img, labels = self.albumentations(img, labels)
+            img, labels = self.albumentations(img, labels)   ## ???? on hm as well???
 
             # HSV color-space
             augment_hsv(img, hgain=hyp['hsv_h'], sgain=hyp['hsv_s'], vgain=hyp['hsv_v'])
@@ -572,12 +587,16 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                 img = np.flipud(img)
                 if nl:
                     labels[:, 2] = 1 - labels[:, 2]
+                if hyp.aux_loss == 'centernet':
+                    hm = np.flipud(hm)
 
             # Flip left-right
             if random.random() < hyp['fliplr']:
                 img = np.fliplr(img)
                 if nl:
                     labels[:, 1] = 1 - labels[:, 1]
+                if hyp.aux_loss == 'centernet':
+                    hm = np.fliplr(hm)
 
             # Cutouts
             # labels = cutout(img, labels, p=0.5)
@@ -589,18 +608,32 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         # Convert
         img = img.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
         img = np.ascontiguousarray(img)
+        if hyp.aux_loss == 'centernet':
+            hm = cv2.resize(hm, (12,12))
+            hm = np.ascontiguousarray(hm)
+            
+            has_box = torch.ones(1) if nL > 0 else torch.zeros(1)
+
+            return torch.from_numpy(img), torch.from_numpy(hm), labels_out, self.img_files[index], shapes, has_box
 
         return torch.from_numpy(img), labels_out, self.img_files[index], shapes
 
     @staticmethod
     def collate_fn(batch):
-        img, label, path, shapes = zip(*batch)  # transposed
+        if len(batch[0]) > 4:  # include hm for aux_loss
+            img, hm, label, path, shapes, has_box = zip(*batch)  # transposed
+        else:
+            img, label, path, shapes = zip(*batch)  # transposed
         for i, l in enumerate(label):
             l[:, 0] = i  # add target image index for build_targets()
-        return torch.stack(img, 0), torch.cat(label, 0), path, shapes
+        if len(batch[0]) > 4:  # include hm for aux_loss
+            return torch.stack(img, 0), torch.stack(hm, 0), torch.cat(label, 0), path, shapes, torch.stack(has_box,0)
+        else:
+            return torch.stack(img, 0), torch.cat(label, 0), path, shapes
 
     @staticmethod
     def collate_fn4(batch):
+        assert len(batch[0]) == 4, 'aux_loss="centernet" not supported with "quad"'
         img, label, path, shapes = zip(*batch)  # transposed
         n = len(shapes) // 4
         img4, label4, path4, shapes4 = [], [], path[:n], shapes[:n]
@@ -648,6 +681,19 @@ def load_image(self, i):
         return self.imgs[i], self.img_hw0[i], self.img_hw[i]  # im, hw_original, hw_resized
 
 
+def create_heatmap(labels, im_w, im_h):
+    output_layer = np.zeros((im_h, im_w, 1))
+
+    for cls, xc, yc, b_w, b_h in labels:
+        x_c, y_c, b_w, b_h = xc*im_w, yc*im_h, b_w*im_w, b_h*im_h
+
+        heatmap = ((np.exp(-(((np.arange(im_w)-x_c)/(b_w/2))**2)/2)).reshape(1,-1)
+                              *(np.exp(-(((np.arange(im_h)-y_c)/(b_h/2))**2)/2)).reshape(-1,1))
+        output_layer[:,:,0] = np.maximum(output_layer[:,:,0], heatmap[:,:])
+
+    return output_layer
+
+
 def load_mosaic(self, index):
     # loads images in a 4-mosaic
 
@@ -659,9 +705,13 @@ def load_mosaic(self, index):
         # Load image
         img, _, (h, w) = load_image(self, index)
 
+        do_hm = self.hyp.aux_loss == 'centernet'
+        if do_hm: hm = create_heatmap(self.labels[index], w, h)
+
         # place img in img4
         if i == 0:  # top left
             img4 = np.full((s * 2, s * 2, img.shape[2]), 114, dtype=np.uint8)  # base image with 4 tiles
+            if do_hm: hm4 = np.full((s * 2, s * 2, 1), 0, dtype=np.float32)
             x1a, y1a, x2a, y2a = max(xc - w, 0), max(yc - h, 0), xc, yc  # xmin, ymin, xmax, ymax (large image)
             x1b, y1b, x2b, y2b = w - (x2a - x1a), h - (y2a - y1a), w, h  # xmin, ymin, xmax, ymax (small image)
         elif i == 1:  # top right
@@ -675,6 +725,7 @@ def load_mosaic(self, index):
             x1b, y1b, x2b, y2b = 0, 0, min(w, x2a - x1a), min(y2a - y1a, h)
 
         img4[y1a:y2a, x1a:x2a] = img[y1b:y2b, x1b:x2b]  # img4[ymin:ymax, xmin:xmax]
+        if do_hm: hm4[y1a:y2a, x1a:x2a] = hm[y1b:y2b, x1b:x2b]
         padw = x1a - x1b
         padh = y1a - y1b
 
@@ -693,16 +744,27 @@ def load_mosaic(self, index):
     # img4, labels4 = replicate(img4, labels4)  # replicate
 
     # Augment
-    img4, labels4, segments4 = copy_paste(img4, labels4, segments4, p=self.hyp['copy_paste'])
-    img4, labels4 = random_perspective(img4, labels4, segments4,
-                                       degrees=self.hyp['degrees'],
-                                       translate=self.hyp['translate'],
-                                       scale=self.hyp['scale'],
-                                       shear=self.hyp['shear'],
-                                       perspective=self.hyp['perspective'],
-                                       border=self.mosaic_border)  # border to remove
+    if do_hm:
+        #img4, labels4, segments4, hm4 = copy_paste(img4, labels4, segments4, hm4, p=self.hyp['copy_paste'] + [1.0])
+        img4, labels4, hm4 = random_perspective(img4, labels4, segments4, 
+                                           hm=hm4,
+                                           degrees=self.hyp['degrees'],
+                                           translate=self.hyp['translate'],
+                                           scale=self.hyp['scale'],
+                                           shear=self.hyp['shear'],
+                                           perspective=self.hyp['perspective'],
+                                           border=self.mosaic_border)  # border to remove
+    else:
+        img4, labels4, segments4 = copy_paste(img4, labels4, segments4, p=self.hyp['copy_paste'])
+        img4, labels4 = random_perspective(img4, labels4, segments4,
+                                           degrees=self.hyp['degrees'],
+                                           translate=self.hyp['translate'],
+                                           scale=self.hyp['scale'],
+                                           shear=self.hyp['shear'],
+                                           perspective=self.hyp['perspective'],
+                                           border=self.mosaic_border)  # border to remove
 
-    return img4, labels4
+    return img4, labels4, hm4 if do_hm else img4, labels4
 
 
 def load_mosaic9(self, index):

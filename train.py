@@ -87,6 +87,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
     if isinstance(hyp, str):
         with open(hyp) as f:
             hyp = yaml.safe_load(f)  # load hyps dict
+    hyp['aux_loss'] = opt.aux_loss   # needed in datasets.load_mosaic
     LOGGER.info(colorstr('hyperparameters: ') + ', '.join(f'{k}={v}' for k, v in hyp.items()))
 
     # Save run settings
@@ -126,7 +127,12 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
         with torch_distributed_zero_first(RANK):
             weights = attempt_download(weights)  # download if not found locally
         ckpt = torch.load(weights, map_location=device)  # load checkpoint
-        model = Model(cfg or ckpt['model'].yaml, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # create
+        if opt.aux_loss == 'centernet':
+            model = V5Centernet(opt.cfg, num_classes=nc,  pretrained=weights, device=device).to(device)
+            bce_loss = nn.BCEWithLogitsLoss()
+            mse_loss = nn.MSELoss()
+        else:
+            model = Model(cfg or ckpt['model'].yaml, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # create
         exclude = ['anchor'] if (cfg or hyp.get('anchors')) and not resume else []  # exclude keys
         csd = ckpt['model'].float().state_dict()  # checkpoint state_dict as FP32
         csd = intersect_dicts(csd, model.state_dict(), exclude=exclude)  # intersect
@@ -342,7 +348,14 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
         #if RANK in [-1, 0]:
         #    pbar = tqdm(pbar, total=nb)  # progress bar
         optimizer.zero_grad()
-        for i, (imgs, targets, paths, _) in pbar:  # batch -------------------------------------------------------------
+
+        for i, batch in pbar:  # batch -------------------------------------------------------------
+            # Unpack batch
+            if opt.aux_loss == 'centernet':
+                imgs, hms, targets, paths, _, has_box = batch
+                hms = hms.to(device, non_blocking=True).float()
+            else:
+                imgs, targets, paths = batch
             ni = i + nb * epoch  # number integrated batches (since train start)
             imgs = imgs.to(device, non_blocking=True).float() / 255.0  # uint8 to float32, 0-255 to 0.0-1.0
 
@@ -370,7 +383,21 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
             # Forward
             with amp.autocast(enabled=cuda):
                 pred = model(imgs)  # forward
-                loss, loss_items = compute_loss(pred, targets.to(device))  # loss scaled by batch_size
+                if opt.aux_loss == 'centernet':
+                    pred, seg_out, logits = pred
+
+                    loss, loss_items = compute_loss(pred, targets.to(device))  # loss scaled by batch_size
+                    
+                    logit_loss = 0.5 * criterion(logits, has_box.to(device))
+                    
+                    seg_out = _sigmoid(seg_out)
+                    hms = torch.unsqueeze(hms, 1)
+                    hm_weight = 10 * (1 - sigmoid_rampup(epoch, int(0.8 * epochs)))
+                    hm_loss = hm_weight * segLoss(seg_out, hms)
+
+                    loss += logit_loss + hm_loss
+                else:
+                    loss, loss_items = compute_loss(pred, targets.to(device))  # loss scaled by batch_size
                 if RANK != -1:
                     loss *= WORLD_SIZE  # gradient averaged between devices in DDP mode
                 if opt.quad:
@@ -549,6 +576,7 @@ def parse_opt(known=False):
     parser.add_argument('--val_iou_thres', type=float, default=0.6, help='IoU threshold for validation mAP')
     parser.add_argument('--val_conf_thres', type=float, default=0.001, help='Confidence threshold for validation mAP')
     parser.add_argument('--freeze', type=int, default=0, help='Number of layers to freeze. backbone=10, all=24')
+    parser.add_argument('--aux_loss', type=str, choices=['', 'centernet'])
     opt = parser.parse_known_args()[0] if known else parser.parse_args()
     return opt
 
