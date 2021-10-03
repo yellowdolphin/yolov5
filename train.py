@@ -32,6 +32,7 @@ sys.path.append(FILE.parents[0].as_posix())  # add yolov5/ to path
 import val  # for end-of-epoch mAP
 from models.experimental import attempt_load
 from models.yolo import Model
+from models.wrapped_models import V5Centernet
 from utils.autoanchor import check_anchors
 from utils.datasets import create_dataloader
 from utils.general import labels_to_class_weights, increment_path, labels_to_image_weights, init_seeds, \

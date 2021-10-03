@@ -626,7 +626,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
             img, label, path, shapes = zip(*batch)  # transposed
         for i, l in enumerate(label):
             l[:, 0] = i  # add target image index for build_targets()
-        if len(batch[0]) > 4:  # include hm for aux_loss
+        if len(batch[0]) > 4:  # include hm and has_box for aux_loss
             return torch.stack(img, 0), torch.stack(hm, 0), torch.cat(label, 0), path, shapes, torch.stack(has_box,0)
         else:
             return torch.stack(img, 0), torch.cat(label, 0), path, shapes
