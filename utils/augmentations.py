@@ -205,7 +205,7 @@ def random_perspective(im, targets=(), segments=(), hm=None, degrees=10, transla
         targets = targets[i]
         targets[:, 1:5] = new[i]
 
-    return img, targets, hm if hm is not None else im, targets
+    return im, targets, hm if hm is not None else im, targets
 
 
 def copy_paste(im, labels, segments, p=0.5):
