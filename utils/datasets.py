@@ -528,7 +528,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         mosaic = self.mosaic and random.random() < hyp['mosaic']
         if mosaic:
             # Load mosaic
-            if hyp.aux_loss == 'centernet':
+            if hyp['aux_loss'] == 'centernet':
                 img, labels, hm = load_mosaic(self, index)
                 assert hyp['mixup'] == 0, 'mixup not implemented for aux_loss="centernet"'
             else:
@@ -549,13 +549,13 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
             shapes = (h0, w0), ((h / h0, w / w0), pad)  # for COCO mAP rescaling
 
             labels = self.labels[index].copy()
-            if hyp.aux_loss == 'centernet':
+            if hyp['aux_loss'] == 'centernet':
                 hm = load_heatmap(labels, w, h)
             if labels.size:  # normalized xywh to pixel xyxy format
                 labels[:, 1:] = xywhn2xyxy(labels[:, 1:], ratio[0] * w, ratio[1] * h, padw=pad[0], padh=pad[1])
 
             if self.augment:
-                if hyp.aux_loss == 'centernet':
+                if hyp['aux_loss'] == 'centernet':
                     img, labels, hm = random_perspective(img, labels,
                                                      hm=hm,
                                                      degrees=hyp['degrees'],
@@ -587,7 +587,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                 img = np.flipud(img)
                 if nl:
                     labels[:, 2] = 1 - labels[:, 2]
-                if hyp.aux_loss == 'centernet':
+                if hyp['aux_loss'] == 'centernet':
                     hm = np.flipud(hm)
 
             # Flip left-right
@@ -595,7 +595,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                 img = np.fliplr(img)
                 if nl:
                     labels[:, 1] = 1 - labels[:, 1]
-                if hyp.aux_loss == 'centernet':
+                if hyp['aux_loss'] == 'centernet':
                     hm = np.fliplr(hm)
 
             # Cutouts
@@ -608,7 +608,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         # Convert
         img = img.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
         img = np.ascontiguousarray(img)
-        if hyp.aux_loss == 'centernet':
+        if hyp['aux_loss'] == 'centernet':
             hm = cv2.resize(hm, (12,12))
             hm = np.ascontiguousarray(hm)
             
@@ -705,7 +705,7 @@ def load_mosaic(self, index):
         # Load image
         img, _, (h, w) = load_image(self, index)
 
-        do_hm = self.hyp.aux_loss == 'centernet'
+        do_hm = self.hyp['aux_loss'] == 'centernet'
         if do_hm: hm = create_heatmap(self.labels[index], w, h)
 
         # place img in img4
