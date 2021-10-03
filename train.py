@@ -355,7 +355,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                 imgs, hms, targets, paths, _, has_box = batch
                 hms = hms.to(device, non_blocking=True).float()
             else:
-                imgs, targets, paths = batch
+                imgs, targets, paths, _ = batch
             ni = i + nb * epoch  # number integrated batches (since train start)
             imgs = imgs.to(device, non_blocking=True).float() / 255.0  # uint8 to float32, 0-255 to 0.0-1.0
 
