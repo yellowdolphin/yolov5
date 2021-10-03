@@ -205,12 +205,7 @@ def random_perspective(im, targets=(), segments=(), hm=None, degrees=10, transla
         targets = targets[i]
         targets[:, 1:5] = new[i]
 
-    print("random_perspective: hm is not None:", hm is not None)
-    return_value = im, targets, hm if hm is not None else im, targets
-    print("will return tuple of", len(return_value))
-    if hm is None:
-        assert len(return_value) == 2, f'len is {len(return_value)}'
-    return return_value
+    return (im, targets, hm) if hm is not None else (im, targets)
 
 
 def copy_paste(im, labels, segments, p=0.5):
