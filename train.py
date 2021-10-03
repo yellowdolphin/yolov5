@@ -129,7 +129,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
             weights = attempt_download(weights)  # download if not found locally
         ckpt = torch.load(weights, map_location=device)  # load checkpoint
         if opt.aux_loss == 'centernet':
-            model = V5Centernet(opt.cfg, num_classes=nc,  pretrained=weights, device=device).to(device)
+            model = V5Centernet(cfg or ckpt['model'].yaml, num_classes=nc,  pretrained=weights, device=device).to(device)
             bce_loss = nn.BCEWithLogitsLoss()
             mse_loss = nn.MSELoss()
         else:
