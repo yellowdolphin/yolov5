@@ -137,6 +137,8 @@ class V5Centernet(nn.Module):
 
             del ckpt, state_dict
 
+        print("in wrapped_model...")
+        print(cfg)
         type = cfg.split('olov5')[-1][0]
         if type == 'x':
             channel_list = [1280, 640, 320, 160, 80]
