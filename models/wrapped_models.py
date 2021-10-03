@@ -15,7 +15,7 @@ from tqdm import tqdm
 from models.yolo import Model
 from torch import nn
 from utils.torch_utils import intersect_dicts, scale_img
-from models.flexible import FlexibleModel
+#from models.flexible import FlexibleModel  # for V5Dual only
 
 def resize_like(x, reference, mode='nearest'):
     if x.shape[2:] !=  reference.shape[2:]:
