@@ -612,7 +612,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
             hm = cv2.resize(hm, (12,12))
             hm = np.ascontiguousarray(hm)
             
-            has_box = torch.ones(1) if nL > 0 else torch.zeros(1)
+            has_box = torch.ones(1) if nl > 0 else torch.zeros(1)
 
             return torch.from_numpy(img), torch.from_numpy(hm), labels_out, self.img_files[index], shapes, has_box
 
