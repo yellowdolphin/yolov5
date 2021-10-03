@@ -764,7 +764,7 @@ def load_mosaic(self, index):
                                            perspective=self.hyp['perspective'],
                                            border=self.mosaic_border)  # border to remove
 
-    return img4, labels4, hm4 if do_hm else img4, labels4
+    return (img4, labels4, hm4) if do_hm else (img4, labels4)
 
 
 def load_mosaic9(self, index):
