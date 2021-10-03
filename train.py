@@ -129,11 +129,12 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
             weights = attempt_download(weights)  # download if not found locally
         ckpt = torch.load(weights, map_location=device)  # load checkpoint
         if opt.aux_loss == 'centernet':
-            model = V5Centernet(cfg or ckpt['model'].yaml, num_classes=nc, pretrained=weights, device=device).to(device)
+            print(f"V5Centernet from {weights} (num_classes={nc})")
+            model = V5Centernet(weights, num_classes=nc, pretrained=pretrained, device=device).to(device)
             bce_loss = nn.BCEWithLogitsLoss()
             mse_loss = nn.MSELoss()
         else:
-            model = Model(weights, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # create
+            model = Model(cfg or ckpt['model'].yaml, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # create
         exclude = ['anchor'] if (cfg or hyp.get('anchors')) and not resume else []  # exclude keys
         csd = ckpt['model'].float().state_dict()  # checkpoint state_dict as FP32
         csd = intersect_dicts(csd, model.state_dict(), exclude=exclude)  # intersect
@@ -225,8 +226,15 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
         del ckpt, csd
 
     # Image sizes
-    gs = max(int(model.stride.max()), 32)  # grid size (max stride)
-    nl = model.model[-1].nl  # number of detection layers (used for scaling hyp['obj'])
+    if hasattr(model, 'model'):  # V5Centernet
+        gs = max(int(model.model.stride.max()), 32)  # grid size (max stride)
+        try:
+            nl = model.model.model[-1].nl
+        except:
+            nl = model.model.detection.nl  # number of detection layers (used for scaling hyp['obj'])
+    else:
+        gs = max(int(model.stride.max()), 32)  # grid size (max stride)
+        nl = model.model[-1].nl  # number of detection layers (used for scaling hyp['obj'])
     imgsz = check_img_size(opt.imgsz, gs, floor=gs * 2)  # verify imgsz is gs-multiple
     assert imgsz >= 64, 'minimum image size is (64, 64)'
 
