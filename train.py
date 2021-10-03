@@ -129,11 +129,11 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
             weights = attempt_download(weights)  # download if not found locally
         ckpt = torch.load(weights, map_location=device)  # load checkpoint
         if opt.aux_loss == 'centernet':
-            model = V5Centernet(cfg or ckpt['model'].yaml, num_classes=nc,  pretrained=weights, device=device).to(device)
+            model = V5Centernet(cfg or ckpt['model'].yaml, num_classes=nc, pretrained=weights, device=device).to(device)
             bce_loss = nn.BCEWithLogitsLoss()
             mse_loss = nn.MSELoss()
         else:
-            model = Model(cfg or ckpt['model'].yaml, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # create
+            model = Model(weights, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # create
         exclude = ['anchor'] if (cfg or hyp.get('anchors')) and not resume else []  # exclude keys
         csd = ckpt['model'].float().state_dict()  # checkpoint state_dict as FP32
         csd = intersect_dicts(csd, model.state_dict(), exclude=exclude)  # intersect
