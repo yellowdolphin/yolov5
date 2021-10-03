@@ -137,8 +137,6 @@ class V5Centernet(nn.Module):
 
             del ckpt, state_dict
 
-        print("cfg in wrapped_model:", list(cfg.keys()))
-        print("pretrained in wrapped_model:", pretrained)
         #type = cfg.split('olov5')[-1][0]
         type = pretrained.split('olov5')[-1][0]
         if type == 'x':
