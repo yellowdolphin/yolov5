@@ -220,7 +220,7 @@ class V5Centernet(nn.Module):
                 features = self.pooling(skip[-1]).view(bs, -1)
                 output = self.fc(self.dropout(features))
 
-        return (x, seg_logit, output) if augment else x
+        return x, seg_logit, output
 
 
 class V5Dual(nn.Module):
