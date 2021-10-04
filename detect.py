@@ -74,6 +74,10 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
     stride, names = 64, [f'class{i}' for i in range(1000)]  # assign defaults
     if pt:
         model = attempt_load(weights, map_location=device)  # load FP32 model
+        if model is None:
+            # load model without fuse
+            model = torch.load(weights, map_location=device)['model'].float()  # load to FP32
+            model.to(device).eval()
         stride = int(model.stride.max())  # model stride
         names = model.module.names if hasattr(model, 'module') else model.names  # get class names
         if half:
