@@ -180,8 +180,6 @@ class V5Centernet(nn.Module):
 
 
     def forward(self, x, augment=False):
-        if not augment:
-            return self.model.model(x, augment=augment)
         y, dt = [], []  # outputs
         bs = x.shape[0]
         ipt = x.clone()
@@ -222,6 +220,7 @@ class V5Centernet(nn.Module):
                 features = self.pooling(skip[-1]).view(bs, -1)
                 output = self.fc(self.dropout(features))
 
+        if not augment: return x
         return x, seg_logit, output
 
 

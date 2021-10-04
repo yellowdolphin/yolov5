@@ -166,7 +166,7 @@ def run(data,
         # Run model
         pred = model(img, augment=augment)
         if len(pred) > 2:
-            print("WARNING: this should be obsolete!!!")
+            print(f"WARNING: this should be obsolete with augment={augment}!!!")
             (out, train_out), _, logits1 = pred  # V5Centernet outputs
         else:
             out, train_out = pred  # inference and training outputs
