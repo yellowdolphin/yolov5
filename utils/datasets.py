@@ -372,6 +372,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         self.stride = stride
         self.path = path
         self.albumentations = Albumentations() if augment else None
+        if hyp['aux_loss'] == 'centernet': self.hm_size = int(img_size / 32)
 
         try:
             f = []  # image files
@@ -609,7 +610,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         img = img.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
         img = np.ascontiguousarray(img)
         if hyp['aux_loss'] == 'centernet':
-            hm = cv2.resize(hm, (12,12))
+            hm = cv2.resize(hm, (self.hm_size, self.hm_size))
             hm = np.ascontiguousarray(hm)
             
             has_box = torch.ones(1) if nl > 0 else torch.zeros(1)

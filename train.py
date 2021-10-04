@@ -419,6 +419,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                     hms = torch.unsqueeze(hms, 1)
                     hm_weight = 10 * (1 - sigmoid_rampup(epoch, int(0.8 * epochs)))
                     assert seg_out.shape == hms.shape, f'shape mismatch: seg_out={seg_out.shape}, hms={hms.shape}'
+                    #### why is seg_out not (12,12) ???
                     hm_loss = hm_weight * mse_loss(seg_out, hms)
 
                     loss += logit_loss + hm_loss
