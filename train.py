@@ -151,11 +151,13 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
             mse_loss = nn.MSELoss()
         else:
             model = Model(cfg or ckpt['model'].yaml, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # create
-        exclude = ['anchor'] if (cfg or hyp.get('anchors')) and not resume else []  # exclude keys
-        csd = ckpt['model'].float().state_dict()  # checkpoint state_dict as FP32
-        csd = intersect_dicts(csd, model.state_dict(), exclude=exclude)  # intersect
-        model.load_state_dict(csd, strict=False)  # load
-        LOGGER.info(f'Transferred {len(csd)}/{len(model.state_dict())} items from {weights}')  # report
+            ### needed for centernet???
+            ###    1/6    120/122    3.28  10.7G  0.10523  0.02135  0.00000  0.12657  1.3e-02  1.3e-02  8.0e-02
+            exclude = ['anchor'] if (cfg or hyp.get('anchors')) and not resume else []  # exclude keys
+            csd = ckpt['model'].float().state_dict()  # checkpoint state_dict as FP32
+            csd = intersect_dicts(csd, model.state_dict(), exclude=exclude)  # intersect
+            model.load_state_dict(csd, strict=False)  # load
+            LOGGER.info(f'Transferred {len(csd)}/{len(model.state_dict())} items from {weights}')  # report
     else:
         model = Model(cfg, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # create
 
