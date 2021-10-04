@@ -120,7 +120,10 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
         t1 = time_sync()
         if pt:
             visualize = increment_path(save_dir / Path(path).stem, mkdir=True) if visualize else False
-            pred = model(img, augment=augment, visualize=visualize)[0]
+            try:
+                pred = model(img, augment=augment, visualize=visualize)[0]
+            except TypeError:
+                pred = model(img, augment=augment)[0]
         elif onnx:
             pred = torch.tensor(session.run([session.get_outputs()[0].name], {session.get_inputs()[0].name: img}))
 
