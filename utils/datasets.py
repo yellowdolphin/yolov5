@@ -550,8 +550,8 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
             shapes = (h0, w0), ((h / h0, w / w0), pad)  # for COCO mAP rescaling
 
             labels = self.labels[index].copy()
-            if hyp['aux_loss'] == 'centernet':
-                hm = load_heatmap(labels, w, h)
+            if (hyp['aux_loss'] == 'centernet') and self.augment:
+                hm = create_heatmap(labels, w, h)
             if labels.size:  # normalized xywh to pixel xyxy format
                 labels[:, 1:] = xywhn2xyxy(labels[:, 1:], ratio[0] * w, ratio[1] * h, padw=pad[0], padh=pad[1])
 
@@ -609,7 +609,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         # Convert
         img = img.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
         img = np.ascontiguousarray(img)
-        if hyp['aux_loss'] == 'centernet':
+        if (hyp['aux_loss'] == 'centernet') and self.augment:
             hm = cv2.resize(hm, (self.hm_size, self.hm_size))
             hm = np.ascontiguousarray(hm)
             
