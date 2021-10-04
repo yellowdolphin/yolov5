@@ -195,10 +195,10 @@ class V5Centernet(nn.Module):
             # if not isinstance(x, list):
             #     print(index, x.shape)
 
-            if index in [0,2,4,6,9]:
+            if augment and (index in [0,2,4,6,9]):
                 skip.append(x)
 
-            if index==9:
+            if augment and (index == 9):
                 # z = self.center(skip[-1])
                 # # print('z shape: ', z.shape)
                 # z = self.decode1([skip[-2], resize_like(z, skip[-2])])  # ; print('d1',x.size())
@@ -219,8 +219,8 @@ class V5Centernet(nn.Module):
 
                 features = self.pooling(skip[-1]).view(bs, -1)
                 output = self.fc(self.dropout(features))
-
-        return x, seg_logit, output
+        if not augment: return x
+        return x, seg_logit, output 
 
 
 class V5Dual(nn.Module):
