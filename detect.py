@@ -78,7 +78,7 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
             # load model without fuse
             model = torch.load(w, map_location=device)['model'].float()  # load to FP32
             model.to(device).eval()
-        stride = int(model.stride.max())  # model stride
+        stride = int(model.stride.max()) if hasattr(model, 'stride') else 1  # model stride
         names = model.module.names if hasattr(model, 'module') else model.names  # get class names
         if half:
             model.half()  # to FP16
