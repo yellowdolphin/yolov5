@@ -164,7 +164,11 @@ def run(data,
         t0 += t - t_
 
         # Run model
-        out, train_out = model(img, augment=augment)  # inference and training outputs
+        pred = model(img, augment=augment)
+        if len(pred) > 2:
+            (out, train_out), _, logits1 = pred  # V5Centernet outputs
+        else:
+            out, train_out = pred  # inference and training outputs
         t1 += time_sync() - t
 
         # Compute loss
