@@ -181,7 +181,7 @@ class V5Centernet(nn.Module):
 
     def forward(self, x, augment=False):
         if not augment:
-            return self.model.model(x)
+            return self.model.model(x, augment)
         y, dt = [], []  # outputs
         bs = x.shape[0]
         ipt = x.clone()
