@@ -123,7 +123,8 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
             try:
                 pred = model(img, augment=augment, visualize=visualize)[0]
             except TypeError:
-                pred = model(img, augment=augment)[0]
+                # Assume V5Centernet
+                pred = model(img, augment=augment)[0][0]
         elif onnx:
             pred = torch.tensor(session.run([session.get_outputs()[0].name], {session.get_inputs()[0].name: img}))
 
