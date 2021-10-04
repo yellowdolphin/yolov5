@@ -418,6 +418,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                     seg_out = clamped_sigmoid(seg_out)
                     hms = torch.unsqueeze(hms, 1)
                     hm_weight = 10 * (1 - sigmoid_rampup(epoch, int(0.8 * epochs)))
+                    assert seg_out.shape == hms.shape, f'shape mismatch: seg_out={seg_out.shape}, hms={hms.shape}'
                     hm_loss = hm_weight * mse_loss(seg_out, hms)
 
                     loss += logit_loss + hm_loss
