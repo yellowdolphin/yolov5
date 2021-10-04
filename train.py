@@ -522,7 +522,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                 if best_fitness == fi:
                     torch.save(ckpt, best)
                     print(f'Model fitness improved, wrote checkpoint {best}')
-                    best_epoch, best_results = epoch, np.array(results).reshape(1, -1)
+                    best_epoch, best_results = epoch, results
                 del ckpt
                 callbacks.on_model_save(last, epoch, final_epoch, best_fitness, fi)
 
