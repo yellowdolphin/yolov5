@@ -144,7 +144,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
         ckpt = torch.load(weights, map_location=device)  # load checkpoint
         if opt.aux_loss == 'centernet':
             assert(opt.noautoanchor), 'centernet needs noautoanchor=True'
-            yaml_dir = 'models/hub/' if weights.endswith('6') else 'models/'
+            yaml_dir = 'models/hub/' if weights.endswith('6.pt') else 'models/'
             yaml_file = yaml_dir + Path(weights).stem + '.yaml'
             print(f"V5Centernet from {yaml_file}, {weights} (num_classes={nc})")
             model = V5Centernet(yaml_file, num_classes=nc, pretrained=weights, device=device).to(device)
