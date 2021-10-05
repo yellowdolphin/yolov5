@@ -137,7 +137,6 @@ class V5Centernet(nn.Module):
 
             del ckpt, state_dict
 
-        #type = cfg.split('olov5')[-1][0]
         type = pretrained.split('olov5')[-1][0]
         if type == 'x':
             channel_list = [1280, 640, 320, 160, 80]
