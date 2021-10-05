@@ -137,17 +137,19 @@ class V5Centernet(nn.Module):
 
             del ckpt, state_dict
 
-        type = pretrained.split('olov5')[-1][0]
-        if type == 'x':
-            channel_list = [1280, 640, 320, 160, 80]
-        elif type ==  'l':
-            channel_list = [1024, 512, 256, 128, 64]
-        elif type == 'm':
-            channel_list = [768, 384, 192, 96, 48]
-        elif type == 's':
-            channel_list = [512, 256, 128, 64, 32]
-        else:
-            raise NotImplementedError(f"model type {type} has not implemented!")
+        width_multiple = self.model.yaml['width_multiple']
+        channel_list = [int(x * width_multiple) for x in (1024, 512, 256, 128, 64)]
+        #type = pretrained.split('olov5')[-1][0]
+        #if type == 'x':
+        #    channel_list = [1280, 640, 320, 160, 80]
+        #elif type ==  'l':
+        #    channel_list = [1024, 512, 256, 128, 64]
+        #elif type == 'm':
+        #    channel_list = [768, 384, 192, 96, 48]
+        #elif type == 's':
+        #    channel_list = [512, 256, 128, 64, 32]
+        #else:
+        #    raise NotImplementedError(f"model type {type} has not implemented!")
 
         #upsampling's head
         # self.center = nn.Sequential(
