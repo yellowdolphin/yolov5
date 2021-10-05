@@ -372,7 +372,10 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         self.stride = stride
         self.path = path
         self.albumentations = Albumentations() if augment else None
-        if hyp['aux_loss'] == 'centernet': self.hm_size = int(img_size / 32)
+        if hyp['aux_loss'] == 'centernet':
+            self.hm_size = int(img_size / stride)
+            print('model stride, hm_size:', self.stride, self.hm_size)
+
 
         try:
             f = []  # image files
