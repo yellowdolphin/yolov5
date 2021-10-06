@@ -196,7 +196,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
             print(f"V5Centernet from {cfg or 'checkpoint'} {weights} (num_classes={nc})")
             model = V5Centernet(cfg or ckpt['model'].yaml, num_classes=nc, pretrained=weights, device=device).to(device)
             bce_loss = nn.BCEWithLogitsLoss()
-            #mse_loss = nn.MSELoss()
+            mse_loss = nn.MSELoss()
             focal_loss = FocalLoss()
         else:
             model = Model(cfg or ckpt['model'].yaml, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # create
@@ -469,8 +469,8 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                     #hm_weight = 10 * (1 - sigmoid_rampup(epoch, int(0.8 * epochs)))
                     hm_weight = 1
                     assert seg_out.shape == hms.shape, f'shape mismatch: seg_out={seg_out.shape}, hms={hms.shape}'
-                    #hm_loss = hm_weight * mse_loss(seg_out, hms)
-                    hm_loss = hm_weight * focal_loss(seg_out, hms)
+                    hm_loss = hm_weight * mse_loss(seg_out, hms)
+                    #hm_loss = hm_weight * focal_loss(seg_out, hms)
 
                     loss += logit_loss + hm_loss
                 else:
