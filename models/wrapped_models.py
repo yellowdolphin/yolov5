@@ -126,8 +126,6 @@ class V5Centernet(nn.Module):
         super().__init__()
         self.model = Model(cfg, ch=3, nc=num_classes)
         if pretrained:
-            # weights = torch.load(pretrained)
-            # self.model.load_state_dict(weights)
             exclude = []  # exclude keys
             ckpt = torch.load(pretrained, map_location=device)  # load checkpoint
             state_dict = ckpt['model'].float().state_dict()  # to FP32
@@ -139,31 +137,6 @@ class V5Centernet(nn.Module):
 
         width_multiple = self.model.yaml['width_multiple']
         channel_list = [int(x * width_multiple) for x in (1024, 512, 256, 128, 64)]
-        #type = pretrained.split('olov5')[-1][0]
-        #if type == 'x':
-        #    channel_list = [1280, 640, 320, 160, 80]
-        #elif type ==  'l':
-        #    channel_list = [1024, 512, 256, 128, 64]
-        #elif type == 'm':
-        #    channel_list = [768, 384, 192, 96, 48]
-        #elif type == 's':
-        #    channel_list = [512, 256, 128, 64, 32]
-        #else:
-        #    raise NotImplementedError(f"model type {type} has not implemented!")
-
-        #upsampling's head
-        # self.center = nn.Sequential(
-        #     nn.Conv2d(channel_list[0], 512, kernel_size=11, padding=5, bias=False),
-        #     nn.BatchNorm2d(512),
-        #     nn.ReLU(inplace=True),
-        # ).to(device)
-
-        # self.decode1 = ResDecode(channel_list[1] + 512, 256).to(device) #layer11 9
-        # self.decode2 = ResDecode(channel_list[2] + 256, 128).to(device) #layer8 6
-        # self.decode3 = ResDecode(channel_list[3] + 128, 64).to(device) #layer6 4
-        # self.decode4 = ResDecode(channel_list[4] + 64, 32).to(device) #layer3 2
-        # self.decode5 = ResDecode(32, 16).to(device)  #layer2 0
-        # self.logit = nn.Conv2d(16, 1, kernel_size=3, padding=1) #segmentation output
 
         self.mask = nn.Sequential(
             nn.Conv2d(channel_list[0], 128, kernel_size=3, padding=1),
