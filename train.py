@@ -62,15 +62,6 @@ def clamped_sigmoid(x):
   y = torch.clamp(x.sigmoid_(), min=1e-4, max=1-1e-4)
   return y
 
-def sigmoid_rampup(current, rampup_length=15):
-    """Exponential rampup from https://arxiv.org/abs/1610.02242"""
-    if rampup_length == 0:
-        return 1.0
-    else:
-        current = np.clip(current, 0.0, rampup_length)
-        phase = 1.0 - current / rampup_length
-        return 0.9*float(np.exp(-5.0 * phase * phase))
-
 
 class FocalLoss(nn.Module):
     '''nn.Module warpper for focal loss'''
@@ -466,11 +457,9 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                     
                     seg_out = clamped_sigmoid(seg_out)
                     hms = torch.unsqueeze(hms, 1)
-                    #hm_weight = 10 * (1 - sigmoid_rampup(epoch, int(0.8 * epochs)))
-                    hm_weight = 1
                     assert seg_out.shape == hms.shape, f'shape mismatch: seg_out={seg_out.shape}, hms={hms.shape}'
-                    hm_loss = hm_weight * mse_loss(seg_out, hms)
-                    #hm_loss = hm_weight * focal_loss(seg_out, hms)
+                    hm_loss = 1.0 * mse_loss(seg_out, hms)
+                    #hm_loss = 1.0 * focal_loss(seg_out, hms)
 
                     loss += logit_loss + hm_loss
                 else:
