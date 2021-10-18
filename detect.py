@@ -76,6 +76,7 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
         model = attempt_load(weights, map_location=device)  # load FP32 model
         if model is None:
             # load model without fuse
+            print("loading model without fuse")
             model = torch.load(w, map_location=device)['model'].float()  # load to FP32
             model.to(device).eval()
         stride = int(model.stride.max()) if hasattr(model, 'stride') else 1  # model stride
