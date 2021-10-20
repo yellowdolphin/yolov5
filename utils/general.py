@@ -587,7 +587,8 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
         i = torchvision.ops.nms(boxes, scores, iou_thres)  # NMS
         if i.shape[0] > max_det:  # limit detections
             i = i[:max_det]
-        if merge #and (1 < n < 3E3):  # Merge NMS (boxes merged using weighted mean)
+        #if merge and (1 < n < 3E3):  # Merge NMS (boxes merged using weighted mean)
+        if merge:
             # update boxes as boxes(i,4) = weights(i,n) * boxes(n,4)
             iou = box_iou(boxes[i], boxes) > iou_thres  # iou matrix
             weights = iou * scores[None]  # box weights
