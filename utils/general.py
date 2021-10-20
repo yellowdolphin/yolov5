@@ -576,12 +576,12 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
         if not n:  # no boxes
             continue
         elif n > max_nms:  # excess boxes
-            merge_debug['x_before': x.shape]
+            merge_debug['x_before'] = x.shape
             x = x[x[:, 4].argsort(descending=True)[:max_nms]]  # sort by confidence
-            merge_debug['x_cutoff': x.shape]
-            merge_debug['n_before': n]
+            merge_debug['x_cutoff'] = x.shape
+            merge_debug['n_before'] = n
             n = x.shape[0]
-            merge_debug['n_cutoff':, n]
+            merge_debug['n_cutoff'] = n
 
         # Batched NMS
         c = x[:, 5:6] * (0 if agnostic else max_wh)  # classes
@@ -597,8 +597,8 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
             if redundant:
                 i = i[iou.sum(1) > 1]  # require redundancy
                 merge_debug['n_redundant'] += 1
-            merge_debug['x_after': x.shape]
-            merge_debug['n_after': x.shape[0]]
+            merge_debug['x_after'] = x.shape
+            merge_debug['n_after'] = x.shape[0]
         elif merge:
             merge_debug['n_toomanyboxes'] += 1
 
