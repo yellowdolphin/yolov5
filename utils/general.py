@@ -527,7 +527,6 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
     redundant = True  # require redundant detections
     multi_label &= nc > 1  # multiple labels per box (adds 0.5ms/img)
     merge = merge_nms  # use merge-NMS
-    merge_debug = {'n_toomanyboxes': 0, 'n_redundant': 0}
 
     t = time.time()
     output = [torch.zeros((0, 6), device=prediction.device)] * prediction.shape[0]
@@ -577,9 +576,6 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
             continue
         elif n > max_nms:  # excess boxes
             x = x[x[:, 4].argsort(descending=True)[:max_nms]]  # sort by confidence
-            merge_debug['n_before'] = n
-            n = x.shape[0]
-            merge_debug['n_cutoff'] = n
 
         # Batched NMS
         c = x[:, 5:6] * (0 if agnostic else max_wh)  # classes
@@ -588,24 +584,19 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
         if i.shape[0] > max_det:  # limit detections
             i = i[:max_det]
         #if merge and (1 < n < 3E3):  # Merge NMS (boxes merged using weighted mean)
-        if merge:
+        if merge:  # above condition is never satisfied with low conf_thres (competition inference)
             # update boxes as boxes(i,4) = weights(i,n) * boxes(n,4)
             iou = box_iou(boxes[i], boxes) > iou_thres  # iou matrix
             weights = iou * scores[None]  # box weights
             x[i, :4] = torch.mm(weights, x[:, :4]).float() / weights.sum(1, keepdim=True)  # merged boxes
             if redundant:
                 i = i[iou.sum(1) > 1]  # require redundancy
-                merge_debug['n_redundant'] += 1
-            merge_debug['n_after'] = x.shape[0]
-        elif merge:
-            merge_debug['n_toomanyboxes'] += 1
 
         output[xi] = x[i]
         if (time.time() - t) > time_limit:
             print(f'WARNING: NMS time limit {time_limit}s exceeded')
             break  # time limit exceeded
 
-    print("non_max_suppression:", merge_debug)
     return output
 
 
