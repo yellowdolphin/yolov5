@@ -224,7 +224,10 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
             v.requires_grad = False
 
     # Image size
-    gs = max(int(model.stride.max()), 32)  # grid size (max stride)
+    if hasattr(model, 'model'):  # V5CenterNet
+        gs = max(int(model.model.stride.max()), 32)
+    else:
+        gs = max(int(model.stride.max()), 32)  # grid size (max stride)
     imgsz = check_img_size(opt.imgsz, gs, floor=gs * 2)  # verify imgsz is gs-multiple
     #assert imgsz >= 64, 'minimum image size is (64, 64)'   ### Check: still necessary???
 
