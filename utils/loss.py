@@ -8,6 +8,7 @@ import torch.nn as nn
 
 from utils.metrics import bbox_iou
 from utils.torch_utils import de_parallel
+from models.wrapped_models import detector_module
 
 
 def smooth_BCE(eps=0.1):  # https://github.com/ultralytics/yolov3/issues/238#issuecomment-598028441
@@ -110,10 +111,7 @@ class ComputeLoss:
         #det = de_parallel(model).model[-1]  # Detect() module
         # This covers model.module.model, model.model, but not (V5CenterNet)
         # model.detection, model.model.detection, model.module.model.detection
-        det = de_parallel(model)
-        if hasattr(det, 'model'): 
-            assert not hasattr(det.model, 'detection'), 'det.model.detection should precede det.model[-1]'
-        det = det.model[-1] if hasattr(det, 'model') else det.detection
+        det = detector_module(model)
         self.balance = {3: [4.0, 1.0, 0.4]}.get(det.nl, [4.0, 1.0, 0.25, 0.06, 0.02])  # P3-P7
         self.ssi = list(det.stride).index(16) if autobalance else 0  # stride 16 index
         self.BCEcls, self.BCEobj, self.gr, self.hyp, self.autobalance = BCEcls, BCEobj, 1.0, h, autobalance

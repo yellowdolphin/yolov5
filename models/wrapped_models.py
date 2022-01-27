@@ -14,7 +14,7 @@ from tqdm import tqdm
 
 from models.yolo import Model
 from torch import nn
-from utils.torch_utils import scale_img
+from utils.torch_utils import scale_img, de_parallel
 from utils.general import intersect_dicts
 #from models.flexible import FlexibleModel  # for V5Dual only
 
@@ -121,6 +121,12 @@ class SingleV5(nn.Module):
             y.append(x if m.i in self.model.save else None)  # save output
 
         return x
+
+
+def detector_module(module):
+    det = de_parallel(model).model
+    return det.detection if hasattr(det, 'detection') else det[-1]
+
 
 class V5Centernet(nn.Module):
     def __init__(self, cfg, num_classes=14, pretrained=None, device='cpu', type='x'):
