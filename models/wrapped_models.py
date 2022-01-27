@@ -125,6 +125,10 @@ class SingleV5(nn.Module):
 
 def detector_module(module):
     det = de_parallel(module).model
+    print("DEBUG detector_module:", det)
+    print(dir(det))
+    print(det.__dict__)
+    det = det.model if hasattr(det, 'model') else det
     return det.detection if hasattr(det, 'detection') else det[-1]
 
 
