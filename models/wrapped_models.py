@@ -15,7 +15,7 @@ from tqdm import tqdm
 from models.yolo import Model
 from torch import nn
 from utils.torch_utils import scale_img
-from utils.general intersect_dicts
+from utils.general import intersect_dicts
 #from models.flexible import FlexibleModel  # for V5Dual only
 
 def resize_like(x, reference, mode='nearest'):
