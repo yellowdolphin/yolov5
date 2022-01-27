@@ -124,7 +124,7 @@ class SingleV5(nn.Module):
 
 
 def detector_module(module):
-    det = de_parallel(model).model
+    det = de_parallel(module).model
     return det.detection if hasattr(det, 'detection') else det[-1]
 
 
