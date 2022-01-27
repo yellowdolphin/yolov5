@@ -682,7 +682,6 @@ def parse_opt(known=False):
     parser.add_argument('--local_rank', type=int, default=-1, help='DDP parameter, do not modify')
     parser.add_argument('--val_iou_thres', type=float, default=0.6, help='IoU threshold for validation mAP')
     parser.add_argument('--val_conf_thres', type=float, default=0.001, help='Confidence threshold for validation mAP')
-    parser.add_argument('--freeze', type=int, default=0, help='Number of layers to freeze. backbone=10, all=24')
     parser.add_argument('--aux_loss', type=str, choices=['', 'centernet'])
 
     # Weights & Biases arguments
