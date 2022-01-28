@@ -131,17 +131,17 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
         # Inference
         visualize = increment_path(save_dir / Path(path).stem, mkdir=True) if visualize else False
         pred = model(im, augment=augment, visualize=visualize)
-        # V5CenterNet pred: tensor[1, 25500, 6], [tensor[]]
-        print("DEBUG: pred has len", len(pred))
-        if len(pred) < 3:
-            for i, x in enumerate(pred):
-                print(f"  pred[{i}]:", x.shape if hasattr(x, 'shape') else (len(x), x[0].shape))
-        elif hasattr(pred, 'shape'):
-            print("DEBUG: pred has shape", pred.shape)
-        else:
-            print("DEBUG: pred:", pred)
-        print("trying with pred[0]...")
-        pred = pred[0]
+        if isinstance(pred, tuple):
+            pred = pred[0]
+        elif not hasattr(pred, 'shape'):
+            print("DEBUG: pred has len", len(pred))
+            if len(pred) < 3:
+                for i, x in enumerate(pred):
+                    print(f"  pred[{i}]:", x.shape if hasattr(x, 'shape') else (len(x), x[0].shape))
+            elif hasattr(pred, 'shape'):
+                print("DEBUG: pred has shape", pred.shape)
+            else:
+                print("DEBUG: pred:", pred)
         t3 = time_sync()
         dt[1] += t3 - t2
 
