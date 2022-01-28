@@ -200,7 +200,7 @@ class V5Centernet(nn.Module):
                 try:
                     feature_visualization(x, m.type, m.i, save_dir=visualize)
                 except AttributeError:
-                    print(f'feature_visualization failed, m.type: {hasattr(m, 'type')}, m.i: {hasattr(m, 'i')}')
+                    print(f'feature_visualization failed, m.type: {hasattr(m, "type")}, m.i: {hasattr(m, "i")}')
                     pass
 
         return x, seg_logit, output
