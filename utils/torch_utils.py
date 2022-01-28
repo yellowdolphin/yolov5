@@ -163,6 +163,17 @@ def de_parallel(model):
     return model.module if is_parallel(model) else model
 
 
+def unwrap_model(model):
+    while hasattr(model, 'model'):
+        model = model.model
+    return model
+
+
+def detector_module(model):
+    model = unwrap_model(de_parallel(model))
+    return model.detection if hasattr(model, 'detection') else model[-1]
+
+
 def initialize_weights(model):
     for m in model.modules():
         t = type(m)

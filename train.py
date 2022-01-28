@@ -44,7 +44,7 @@ ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 import val  # for end-of-epoch mAP
 from models.experimental import attempt_load
 from models.yolo import Model
-from models.wrapped_models import V5Centernet, detector_module
+from models.wrapped_models import V5Centernet
 from utils.autoanchor import check_anchors
 from utils.autobatch import check_train_batch_size
 from utils.callbacks import Callbacks
@@ -60,6 +60,7 @@ from utils.loss import ComputeLoss
 from utils.metrics import fitness
 from utils.plots import plot_evolve, plot_labels
 from utils.torch_utils import EarlyStopping, ModelEMA, de_parallel, select_device, torch_distributed_zero_first
+from utils.torch_utils import detector_module
 
 cu_version = run('nvcc --version', shell=True, capture_output=True, encoding='utf-8').stdout
 if 'V11.0' in cu_version:

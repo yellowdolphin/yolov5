@@ -123,12 +123,6 @@ class SingleV5(nn.Module):
         return x
 
 
-def detector_module(module):
-    det = de_parallel(module).model
-    det = det.model if hasattr(det, 'model') else det
-    return det.detection if hasattr(det, 'detection') else det[-1]
-
-
 class V5Centernet(nn.Module):
     def __init__(self, cfg, num_classes=14, pretrained=None, device='cpu', type='x'):
         super().__init__()
