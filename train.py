@@ -318,19 +318,6 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
 
         del ckpt, csd
 
-    ## Image sizes ### obsolete or needed by V5Centernet???
-    #if hasattr(model, 'model'):  # V5Centernet
-    #    gs = max(int(model.model.stride.max()), 32)  # grid size (max stride)
-    #    try:
-    #        nl = model.model.model[-1].nl
-    #    except:
-    #        nl = model.model.detection.nl  # number of detection layers (used for scaling hyp['obj'])
-    #else:
-    #    gs = max(int(model.stride.max()), 32)  # grid size (max stride)
-    #    nl = model.model[-1].nl  # number of detection layers (used for scaling hyp['obj'])
-    #imgsz = check_img_size(opt.imgsz, gs, floor=gs * 2)  # verify imgsz is gs-multiple
-    #assert imgsz >= 64, 'minimum image size is (64, 64)'
-
     # DP mode
     if cuda and RANK == -1 and torch.cuda.device_count() > 1:
         LOGGER.warning('WARNING: DP not recommended, use torch.distributed.run for best DDP Multi-GPU results.\n'
