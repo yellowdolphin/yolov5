@@ -741,8 +741,12 @@ def main(opt, callbacks=Callbacks()):
     if not opt.evolve:
         train(opt.hyp, opt, device, callbacks)
         if WORLD_SIZE > 1 and RANK == 0:
+            print(f'DEBUG: WORLD_SIZE: {WORLD_SIZE}, RANK: {RANK}, Destroying process group...')
             LOGGER.info('Destroying process group... ')
             dist.destroy_process_group()
+        else:
+            print("DEBUG: returning from train.py...")
+            return
 
     # Evolve hyperparameters (optional)
     else:
