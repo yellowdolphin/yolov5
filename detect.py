@@ -130,10 +130,16 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
 
         # Inference
         visualize = increment_path(save_dir / Path(path).stem, mkdir=True) if visualize else False
-        try:
-            pred = model(im, augment=augment, visualize=visualize)
-        except TypeError:
-            pred = model(im, augment=augment)[0][0]   ### [0][0] or [0] ???
+        pred = model(im, augment=augment, visualize=visualize)
+        print("DEBUG: pred has len", len(pred))
+        if len(pred) < 3:
+            for i, x in enumerate(pred):
+                print(f"  pred[{i}]:", x.shape if hasattr(x, 'shape') else x)
+        elif hasattr(pred, 'shape'):
+            print("DEBUG: pred has shape", pred.shape)
+        else:
+            print("DEBUG: pred:", pred)
+        print("trying with pred[0]...")
         t3 = time_sync()
         dt[1] += t3 - t2
 
