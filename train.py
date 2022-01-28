@@ -225,7 +225,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
             v.requires_grad = False
 
     # Image size
-    if hasattr(model, 'model'):  # V5CenterNet
+    if hasattr(model, 'model') and hasattr(model.model, 'stride'):  # V5CenterNet
         gs = max(int(model.model.stride.max()), 32)
     elif hasattr(model, 'stride'):
         gs = max(int(model.stride.max()), 32)  # grid size (max stride)
