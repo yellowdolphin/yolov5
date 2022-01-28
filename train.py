@@ -60,7 +60,7 @@ from utils.loss import ComputeLoss
 from utils.metrics import fitness
 from utils.plots import plot_evolve, plot_labels
 from utils.torch_utils import EarlyStopping, ModelEMA, de_parallel, select_device, torch_distributed_zero_first
-from utils.torch_utils import detector_module
+from utils.torch_utils import detector_module, unwrap_model
 
 cu_version = run('nvcc --version', shell=True, capture_output=True, encoding='utf-8').stdout
 if 'V11.0' in cu_version:
@@ -227,8 +227,11 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
     # Image size
     if hasattr(model, 'model'):  # V5CenterNet
         gs = max(int(model.model.stride.max()), 32)
-    else:
+    elif hasattr(model, 'stride'):
         gs = max(int(model.stride.max()), 32)  # grid size (max stride)
+    else:
+        print('model has no stride, trying to unwrap...')
+        gs = max(int(unwrap_model(model).stride.max()), 32)  # grid size (max stride)
     imgsz = check_img_size(opt.imgsz, gs, floor=gs * 2)  # verify imgsz is gs-multiple
 
     # Batch size
