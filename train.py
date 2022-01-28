@@ -588,8 +588,8 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                     torch.save(ckpt, best)
                     print(f'Model fitness improved, wrote checkpoint {best}')
                     #best_epoch, best_results = epoch, np.array(results).reshape(1, -1)
-                    #best_epoch, best_results = epoch + 1, results  ### previous commit. Does the following work???
-                    best_epoch, best_results = epoch + 1, np.array(results).reshape(1, -1)
+                    best_epoch, best_results = epoch + 1, results  ### previous commit. Does the following work???
+                    #best_epoch, best_results = epoch + 1, np.array(results).reshape(1, -1)   ### no 
                 if (epoch > 0) and (opt.save_period > 0) and (epoch % opt.save_period == 0):
                     torch.save(ckpt, w / f'epoch{epoch}.pt')
                 del ckpt
