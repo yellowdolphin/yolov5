@@ -140,6 +140,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
         else:
             print("DEBUG: pred:", pred)
         print("trying with pred[0]...")
+        pred = pred[0]
         t3 = time_sync()
         dt[1] += t3 - t2
 
