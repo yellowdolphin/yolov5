@@ -155,7 +155,7 @@ class V5Centernet(nn.Module):
         self.dropout = nn.Dropout(0.2)
 
 
-    def forward(self, x, augment=False):
+    def forward(self, x, augment=False, visualize=False):
         y, dt = [], []  # outputs
         bs = x.shape[0]
         ipt = x.clone()
@@ -195,6 +195,13 @@ class V5Centernet(nn.Module):
 
                 features = self.pooling(skip[-1]).view(bs, -1)
                 output = self.fc(self.dropout(features))
+
+            if visualize:
+                try:
+                    feature_visualization(x, m.type, m.i, save_dir=visualize)
+                except AttributeError:
+                    print(f'feature_visualization failed, m.type: {hasattr(m, 'type')}, m.i: {hasattr(m, 'i')}')
+                    pass
 
         return x, seg_logit, output
 

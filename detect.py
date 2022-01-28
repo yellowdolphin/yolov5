@@ -133,7 +133,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
         try:
             pred = model(im, augment=augment, visualize=visualize)
         except TypeError:
-            pred = model(img, augment=augment)[0][0]   ### [0][0] or [0] ???
+            pred = model(im, augment=augment)[0][0]   ### [0][0] or [0] ???
         t3 = time_sync()
         dt[1] += t3 - t2
 
