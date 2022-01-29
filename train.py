@@ -225,16 +225,18 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
             v.requires_grad = False
 
     # Image size
-    if hasattr(model, 'model') and hasattr(model.model, 'stride'):  # V5CenterNet
-        gs = max(int(model.model.stride.max()), 32)
-        print(f'model.model has max stride {model.model.stride.max()}, gs: {gs}')
-    elif hasattr(model, 'stride'):
-        gs = max(int(model.stride.max()), 32)  # grid size (max stride)
-        print(f'model has max stride {model.stride.max()}, gs: {gs}')
-    else:
-        print('model has no stride, trying to unwrap...')
-        gs = max(int(unwrap_model(model).stride.max()), 32)  # grid size (max stride)
-        print(f'unwrapped model has max stride {unwrap_model(model).stride.max()}, gs: {gs}')
+    gs = max(int(model.stride.max()), 32)
+    ### this should be obsolete:
+    #if hasattr(model, 'model') and hasattr(model.model, 'stride'):  # V5CenterNet
+    #    gs = max(int(model.model.stride.max()), 32)
+    #    print(f'model.model has max stride {model.model.stride.max()}, gs: {gs}')
+    #elif hasattr(model, 'stride'):
+    #    gs = max(int(model.stride.max()), 32)  # grid size (max stride)
+    #    print(f'model has max stride {model.stride.max()}, gs: {gs}')
+    #else:
+    #    print('model has no stride, trying to unwrap...')
+    #    gs = max(int(unwrap_model(model).stride.max()), 32)  # grid size (max stride)
+    #    print(f'unwrapped model has max stride {unwrap_model(model).stride.max()}, gs: {gs}')
     imgsz = check_img_size(opt.imgsz, gs, floor=gs * 2)  # verify imgsz is gs-multiple
 
     # Batch size

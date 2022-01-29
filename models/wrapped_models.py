@@ -153,6 +153,8 @@ class V5Centernet(nn.Module):
         self.pooling = nn.AdaptiveAvgPool2d(1)
         self.fc = nn.Linear(channel_list[0], 1)
         self.dropout = nn.Dropout(0.2)
+        if hasattr(self.model, 'stride'):
+            self.stride = self.model.stride
 
 
     def forward(self, x, augment=False, visualize=False):
