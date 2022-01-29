@@ -581,8 +581,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                     torch.save(ckpt, best)
                     print(f'Model fitness improved, wrote checkpoint {best}')
                     #best_epoch, best_results = epoch, np.array(results).reshape(1, -1)
-                    best_epoch, best_results = epoch + 1, results  ### previous commit. Does the following work???
-                    #best_epoch, best_results = epoch + 1, np.array(results).reshape(1, -1)   ### no 
+                    best_epoch, best_results = epoch + 1, results
                 if (epoch > 0) and (opt.save_period > 0) and (epoch % opt.save_period == 0):
                     torch.save(ckpt, w / f'epoch{epoch}.pt')
                 del ckpt
@@ -640,6 +639,8 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
         np.savetxt(save_dir/'lrs.csv', np.array(lrs), delimiter=',')
 
     torch.cuda.empty_cache()
+    print("DEBUG: deleting dataloaders and pbar before returning from train...")
+    del train_loader, val_loader, pbar
     return results
 
 
@@ -741,12 +742,11 @@ def main(opt, callbacks=Callbacks()):
     if not opt.evolve:
         train(opt.hyp, opt, device, callbacks)
         if WORLD_SIZE > 1 and RANK == 0:
-            print(f'DEBUG: WORLD_SIZE: {WORLD_SIZE}, RANK: {RANK}, Destroying process group...')
             LOGGER.info('Destroying process group... ')
             dist.destroy_process_group()
-        else:
-            print("DEBUG: returning from train.py...")
-            return
+    
+        print("DEBUG: returning from main...")
+        return
 
     # Evolve hyperparameters (optional)
     else:
