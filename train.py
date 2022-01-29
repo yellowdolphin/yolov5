@@ -22,6 +22,7 @@ from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 from subprocess import run
+import logging
 
 import numpy as np
 import torch
@@ -161,7 +162,6 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
     # Image size
     gs = max(int(model.stride.max()), 32)  # grid size (max stride)
     imgsz = check_img_size(opt.imgsz, gs, floor=gs * 2)  # verify imgsz is gs-multiple
-    #assert imgsz >= 64, 'minimum image size is (64, 64)'   ### Check: still necessary???
 
     # Batch size
     if RANK == -1 and batch_size == -1:  # single-GPU only, estimate best batch size
@@ -483,7 +483,8 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                 if best_fitness == fi:
                     torch.save(ckpt, best)
                     print(f'Model fitness improved, wrote checkpoint {best}')
-                    best_epoch, best_results = epoch, np.array(results).reshape(1, -1)
+                    #best_epoch, best_results = epoch, np.array(results).reshape(1, -1)
+                    best_epoch, best_results = epoch + 1, results
                 if (epoch > 0) and (opt.save_period > 0) and (epoch % opt.save_period == 0):
                     torch.save(ckpt, w / f'epoch{epoch}.pt')
                 del ckpt
@@ -515,10 +516,6 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
         LOGGER.info(f'\n{epochs} epochs completed in {wall / 3600:.3f} hours.')
         LOGGER.info(f'Best epoch  mAP@0.50     mAP  Wall (min/ep)')
         LOGGER.info(f'{best_epoch:10}{best_results[2]:10.5f}{best_results[3]:8.5f}{wall / 60 / epochs:15.2f}')
-        if not evolve:
-            # Print metrics, json for submission to original COCO benchmark (skip otherwise)
-            if is_coco:  # COCO dataset
-                for m in [last, best] if best.exists() else [last]:  # speed, mAP tests
         for f in last, best:
             if f.exists():
                 strip_optimizer(f)  # strip optimizers
