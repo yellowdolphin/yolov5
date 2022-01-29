@@ -311,6 +311,10 @@ class DetectMultiBackend(nn.Module):
                 print("loading model without fuse")
                 model = torch.load(w, map_location=device)['model'].float()  # load to FP32
                 model.to(device).eval()
+                if hasattr(model, 'stride'):
+                    print(f"model.stride: {model.stride}")
+                else:
+                    print(f"WARNING: loaded model has no stride, using stride=1")
             stride = max(int(model.stride.max()), 32) if hasattr(model, 'stride') else 1  # model stride
             names = model.module.names if hasattr(model, 'module') else model.names  # get class names
             self.model = model  # explicitly assign for to(), cpu(), cuda(), half()
