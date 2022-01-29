@@ -156,6 +156,9 @@ class V5Centernet(nn.Module):
         if hasattr(self.model, 'stride'):
             self.stride = self.model.stride
 
+    def fuse(self):
+        print("WARNING: ignoring fuse() on V5Centernet")
+        return self
 
     def forward(self, x, augment=False, visualize=False):
         y, dt = [], []  # outputs
