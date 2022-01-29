@@ -59,7 +59,6 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
         imgsz=(640, 640),  # inference size (height, width)
         conf_thres=0.25,  # confidence threshold
         iou_thres=0.45,  # NMS IOU threshold
-        merge_nms=False, # use merge-NMS
         max_det=1000,  # maximum detections per image
         device='',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
         view_img=False,  # show results
@@ -132,16 +131,15 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
         visualize = increment_path(save_dir / Path(path).stem, mkdir=True) if visualize else False
         pred = model(im, augment=augment, visualize=visualize)
         if isinstance(pred, tuple):
-            pred = pred[0]
+            pred = pred[0]  # V5CenterNet
         elif not hasattr(pred, 'shape'):
             print("DEBUG: pred has len", len(pred))
             if len(pred) < 3:
                 for i, x in enumerate(pred):
                     print(f"  pred[{i}]:", x.shape if hasattr(x, 'shape') else (len(x), x[0].shape))
-            elif hasattr(pred, 'shape'):
-                print("DEBUG: pred has shape", pred.shape)
             else:
                 print("DEBUG: pred:", pred)
+        print("DEBUG: pred has shape", pred.shape)
         t3 = time_sync()
         dt[1] += t3 - t2
 
@@ -193,8 +191,8 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                             save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
 
             # Print time (inference-only)
-            #LOGGER.info(f'{s}Done. ({t3 - t2:.3f}s)')
-            #print(f'{s}Done. ({t2 - t1:.3f}s)')
+            LOGGER.info(f'{s}Done. ({t3 - t2:.3f}s)')
+            #print(f'{s}Done. ({t3 - t2:.3f}s)')
 
             # Stream results
             im0 = annotator.result()
@@ -239,7 +237,6 @@ def parse_opt():
     parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640], help='inference size h,w')
     parser.add_argument('--conf-thres', type=float, default=0.25, help='confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.45, help='NMS IoU threshold')
-    parser.add_argument('--merge-nms', action='store_true', help='use merge-NMS')
     parser.add_argument('--max-det', type=int, default=1000, help='maximum detections per image')
     parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--view-img', action='store_true', help='show results')
