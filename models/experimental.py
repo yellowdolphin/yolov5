@@ -95,12 +95,7 @@ def attempt_load(weights, map_location=None, inplace=True, fuse=True):
     for w in weights if isinstance(weights, list) else [weights]:
         ckpt = torch.load(attempt_download(w), map_location=map_location)  # load
         if fuse:
-            try:
-                print("DEBUG: try original model.append...")
-                model.append(ckpt['ema' if ckpt.get('ema') else 'model'].float().fuse().eval())  # FP32 model
-                print("DEBUG: ...works => try in models.experimental.attempt_load is obsolete")
-            except torch.nn.modules.module.ModuleAttributeError:
-                return None  # load manually in detect.py
+            model.append(ckpt['ema' if ckpt.get('ema') else 'model'].float().fuse().eval())  # FP32 model
         else:
             model.append(ckpt['ema' if ckpt.get('ema') else 'model'].float().eval())  # without layer fuse
 
