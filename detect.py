@@ -132,14 +132,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
         pred = model(im, augment=augment, visualize=visualize)
         if isinstance(pred, tuple):
             pred = pred[0]  # V5CenterNet
-        elif not hasattr(pred, 'shape'):
-            print("DEBUG: pred has len", len(pred))
-            if len(pred) < 3:
-                for i, x in enumerate(pred):
-                    print(f"  pred[{i}]:", x.shape if hasattr(x, 'shape') else (len(x), x[0].shape))
-            else:
-                print("DEBUG: pred:", pred)
-        print("DEBUG: pred has shape", pred.shape)
+        #print("DEBUG: pred has shape", pred.shape)  # [1, 25500, 6]
         t3 = time_sync()
         dt[1] += t3 - t2
 
