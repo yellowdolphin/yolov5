@@ -613,8 +613,11 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
         epochs = epoch - start_epoch + 1
         wall = time.time() - t0
         LOGGER.info(f'\n{epochs} epochs completed in {wall / 3600:.3f} hours.')
-        LOGGER.info(f'Best_ep\tmAP@0.50\tmAP\tWall (min/ep)')
-        LOGGER.info(f'{best_epoch}\t{best_results[2]:.5f}\t{best_results[3]:.5f}\t{wall / 60 / epochs:.2f}')
+        #LOGGER.info(f'Best_ep\tmAP@0.50\tmAP\tWall (min/ep)')
+        #LOGGER.info(f'{best_epoch}\t{best_results[2]:.5f}\t{best_results[3]:.5f}\t{wall / 60 / epochs:.2f}')
+        LOGGER.info(f'Best_ep\tPrecision\tRecall\tmAP@0.50\tmAP\tWall (min/ep)')
+        LOGGER.info(f'{best_epoch}\t{best_results[0]:.5f}\t{best_results[1]:.5f}'
+                    f'\t{best_results[2]:.5f}\t{best_results[3]:.5f}\t{wall / 60 / epochs:.2f}')
         for f in last, best:
             if f.exists():
                 strip_optimizer(f)  # strip optimizers
