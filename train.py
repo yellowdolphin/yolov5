@@ -551,6 +551,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                                            imgsz=imgsz,
                                            conf_thres=opt.val_conf_thres,
                                            iou_thres=opt.val_iou_thres,
+                                           max_det=opt.val_max_det,
                                            model=ema.ema,
                                            single_cls=single_cls,
                                            dataloader=val_loader,
@@ -628,6 +629,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                                             imgsz=imgsz,
                                             model=attempt_load(f, device).half(),
                                             iou_thres=0.65 if is_coco else 0.60,  # best pycocotools results at 0.65
+                                            max_det=opt.val_max_det,
                                             single_cls=single_cls,
                                             dataloader=val_loader,
                                             save_dir=save_dir,
@@ -642,6 +644,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                                             imgsz=imgsz,
                                             model=attempt_load(f, device, fuse=False).half(),  # no benefit in fuse
                                             iou_thres=0.65 if is_coco else 0.60,  # best pycocotools results at 0.65
+                                            max_det=opt.val_max_det,
                                             single_cls=single_cls,
                                             dataloader=val_loader,
                                             save_dir=save_dir,
@@ -700,6 +703,7 @@ def parse_opt(known=False):
     parser.add_argument('--local_rank', type=int, default=-1, help='DDP parameter, do not modify')
     parser.add_argument('--val_iou_thres', type=float, default=0.6, help='IoU threshold for validation mAP')
     parser.add_argument('--val_conf_thres', type=float, default=0.001, help='Confidence threshold for validation mAP')
+    parser.add_argument('--val_max_det', type=int, default=300, help='Max number of detections for validation mAP')
     parser.add_argument('--aux_loss', type=str, choices=['', 'centernet'])
 
     # Weights & Biases arguments
