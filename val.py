@@ -206,7 +206,9 @@ def run(data,
         lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if save_hybrid else []  # for autolabelling
         t3 = time_sync()
         #out = non_max_suppression(out, conf_thres, iou_thres, labels=lb, multi_label=True, agnostic=single_cls)
+        out_shape_before_nms = out.shape
         out = non_max_suppression(out, conf_thres, iou_thres, labels=lb, multi_label=True, agnostic=single_cls, max_det=max_det)
+        print("DEBUG: preds shape before NMS:", out_shape_before_nms, "after:", out.shape)
         dt[2] += time_sync() - t3
 
         # Metrics
