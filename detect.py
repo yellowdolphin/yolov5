@@ -46,6 +46,7 @@ from utils.general import (LOGGER, check_file, check_img_size, check_imshow, che
                            increment_path, non_max_suppression, print_args, scale_coords, strip_optimizer, xyxy2xywh)
 from utils.plots import Annotator, colors, save_one_box
 from utils.torch_utils import select_device, time_sync
+from tqdm.auto import tqdm  # not in orig
 
 cu_version = run('nvcc --version', shell=True, capture_output=True, encoding='utf-8').stdout
 if 'V11.0' in cu_version:
@@ -117,7 +118,8 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
     # Run inference
     model.warmup(imgsz=(1, 3, *imgsz), half=half)  # warmup
     dt, seen = [0.0, 0.0, 0.0], 0
-    for path, im, im0s, vid_cap, s in dataset:
+    #for path, im, im0s, vid_cap, s in dataset:
+    for path, im, im0s, vid_cap, s in tqdm(dataset, total=len(dataset)):  # not in orig
         t1 = time_sync()
         im = torch.from_numpy(im).to(device)
         im = im.half() if half else im.float()  # uint8 to fp16/32
