@@ -4,6 +4,8 @@ Auto-anchor utils
 """
 
 import random
+import sys
+import logging
 
 import numpy as np
 import torch
@@ -12,6 +14,9 @@ from tqdm import tqdm
 
 from utils.general import LOGGER, colorstr, emojis
 
+if (len(logging.root.handlers) == 1) and hasattr(logging.root.handlers[0], 'baseFilename'):
+    # Logging to /tmp/kaggle.log is fine, but we also want some of the info on stdout!
+    LOGGER.addHandler(logging.StreamHandler(sys.stdout))
 PREFIX = colorstr('AutoAnchor: ')
 
 
