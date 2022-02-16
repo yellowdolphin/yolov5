@@ -4,8 +4,6 @@ Auto-anchor utils
 """
 
 import random
-import sys
-import logging
 
 import numpy as np
 import torch
@@ -14,9 +12,6 @@ from tqdm import tqdm
 
 from utils.general import LOGGER, colorstr, emojis
 
-if (len(logging.root.handlers) == 1) and hasattr(logging.root.handlers[0], 'baseFilename'):
-    # Logging to /tmp/kaggle.log is fine, but we also want some of the info on stdout!
-    LOGGER.addHandler(logging.StreamHandler(sys.stdout))
 PREFIX = colorstr('AutoAnchor: ')
 
 
@@ -50,21 +45,26 @@ def check_anchors(dataset, model, thr=4.0, imgsz=640):
     s = f'\n{PREFIX}{aat:.2f} anchors/target, {bpr:.3f} Best Possible Recall (BPR). '
     if bpr > 0.98:  # threshold to recompute
         LOGGER.info(emojis(f'{s}Current anchors are a good fit to dataset ✅'))
+        print(emojis(f'{s}Current anchors are a good fit to dataset ✅'))
     else:
         LOGGER.info(emojis(f'{s}Anchors are a poor fit to dataset ⚠️, attempting to improve...'))
+        print(emojis(f'{s}Anchors are a poor fit to dataset ⚠️, attempting to improve...'))
         na = m.anchors.numel() // 2  # number of anchors
         try:
             anchors = kmean_anchors(dataset, n=na, img_size=imgsz, thr=thr, gen=1000, verbose=False)
         except Exception as e:
             LOGGER.info(f'{PREFIX}ERROR: {e}')
+            print(f'{PREFIX}ERROR: {e}')
         new_bpr = metric(anchors)[0]
         if new_bpr > bpr:  # replace anchors
             anchors = torch.tensor(anchors, device=m.anchors.device).type_as(m.anchors)
             m.anchors[:] = anchors.clone().view_as(m.anchors) / m.stride.to(m.anchors.device).view(-1, 1, 1)  # loss
             check_anchor_order(m)
             LOGGER.info(f'{PREFIX}New anchors saved to model. Update model *.yaml to use these anchors in the future.')
+            print(f'{PREFIX}New anchors saved to model. Update model *.yaml to use these anchors in the future.')
         else:
             LOGGER.info(f'{PREFIX}Original anchors better than new anchors. Proceeding with original anchors.')
+            print(f'{PREFIX}Original anchors better than new anchors. Proceeding with original anchors.')
 
 
 def kmean_anchors(dataset='./data/coco128.yaml', n=9, img_size=640, thr=4.0, gen=1000, verbose=True):
