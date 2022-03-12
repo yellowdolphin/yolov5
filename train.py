@@ -317,6 +317,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
             epochs += ckpt['epoch']  # finetune additional epochs
         if start_epoch > 0:
             print(f"Resuming training, start_epoch = {start_epoch}")
+        best_epoch = start_epoch
 
         del ckpt, csd
 
