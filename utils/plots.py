@@ -180,7 +180,8 @@ def output_to_target(output):
     return np.array(targets)
 
 
-def plot_images(images, targets, paths=None, fname='images.jpg', names=None, max_size=1920, max_subplots=16):
+def plot_images(images, targets, paths=None, fname='images.jpg', names=None, max_size=1920, max_subplots=16,
+                font_scale=1.0):
     # Plot image grid with labels
     if isinstance(images, torch.Tensor):
         images = images.cpu().float().numpy()
@@ -209,7 +210,7 @@ def plot_images(images, targets, paths=None, fname='images.jpg', names=None, max
         mosaic = cv2.resize(mosaic, tuple(int(x * ns) for x in (w, h)))
 
     # Annotate
-    fs = int((h + w) * ns * 0.01)  # font size
+    fs = int(font_scale * (h + w) * ns * 0.01)  # font size
     annotator = Annotator(mosaic, line_width=round(fs / 10), font_size=fs, pil=True)
     for i in range(i + 1):
         x, y = int(w * (i // ns)), int(h * (i % ns))  # block origin
