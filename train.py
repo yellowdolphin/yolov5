@@ -225,18 +225,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
             v.requires_grad = False
 
     # Image size
-    gs = max(int(model.stride.max()), 32)
-    ### this should be obsolete:
-    #if hasattr(model, 'model') and hasattr(model.model, 'stride'):  # V5CenterNet
-    #    gs = max(int(model.model.stride.max()), 32)
-    #    print(f'model.model has max stride {model.model.stride.max()}, gs: {gs}')
-    #elif hasattr(model, 'stride'):
-    #    gs = max(int(model.stride.max()), 32)  # grid size (max stride)
-    #    print(f'model has max stride {model.stride.max()}, gs: {gs}')
-    #else:
-    #    print('model has no stride, trying to unwrap...')
-    #    gs = max(int(unwrap_model(model).stride.max()), 32)  # grid size (max stride)
-    #    print(f'unwrapped model has max stride {unwrap_model(model).stride.max()}, gs: {gs}')
+    gs = max(int(model.stride.max()), 32)  # grid size (max stride)
     imgsz = check_img_size(opt.imgsz, gs, floor=gs * 2)  # verify imgsz is gs-multiple
 
     # Batch size
@@ -474,9 +463,9 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                     pred, seg_out, logits = pred
 
                     loss, loss_items = compute_loss(pred, targets.to(device))  # loss scaled by batch_size
-                    
+
                     logit_loss = 0.5 * bce_loss(logits, has_box.to(device))
-                    
+
                     seg_out = clamped_sigmoid(seg_out)
                     hms = torch.unsqueeze(hms, 1)
                     assert seg_out.shape == hms.shape, f'shape mismatch: seg_out={seg_out.shape}, hms={hms.shape}'
@@ -648,8 +637,6 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
         np.savetxt(save_dir/'lrs.csv', np.array(lrs), delimiter=',')
 
     torch.cuda.empty_cache()
-    print("DEBUG: deleting dataloaders and pbar before returning from train...")
-    del train_loader, val_loader, pbar
     return results
 
 
@@ -754,9 +741,6 @@ def main(opt, callbacks=Callbacks()):
         if WORLD_SIZE > 1 and RANK == 0:
             LOGGER.info('Destroying process group... ')
             dist.destroy_process_group()
-    
-        print("DEBUG: returning from main...")
-        return
 
     # Evolve hyperparameters (optional)
     else:

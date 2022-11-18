@@ -611,7 +611,7 @@ class LoadImagesAndLabels(Dataset):
 
         if self.augment:
             # Albumentations
-            img, labels = self.albumentations(img, labels)   ## ???? on hm as well???
+            img, labels = self.albumentations(img, labels)
             nl = len(labels)  # update after albumentations
 
             # HSV color-space
@@ -647,7 +647,7 @@ class LoadImagesAndLabels(Dataset):
         if self.augment and (hyp['aux_loss'] == 'centernet'):
             hm = cv2.resize(hm, (self.hm_size, self.hm_size))
             hm = np.ascontiguousarray(hm)
-            
+
             has_box = torch.ones(1) if nl > 0 else torch.zeros(1)
 
             return torch.from_numpy(img), torch.from_numpy(hm), labels_out, self.img_files[index], shapes, has_box
@@ -781,8 +781,7 @@ def load_mosaic(self, index):
 
     # Augment
     if do_hm:
-        #img4, labels4, segments4, hm4 = copy_paste(img4, labels4, segments4, hm4, p=self.hyp['copy_paste'] + [1.0])
-        img4, labels4, hm4 = random_perspective(img4, labels4, segments4, 
+        img4, labels4, hm4 = random_perspective(img4, labels4, segments4,
                                            hm=hm4,
                                            degrees=self.hyp['degrees'],
                                            translate=self.hyp['translate'],

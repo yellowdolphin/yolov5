@@ -133,8 +133,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
         visualize = increment_path(save_dir / Path(path).stem, mkdir=True) if visualize else False
         pred = model(im, augment=augment, visualize=visualize)
         if isinstance(pred, tuple):
-            pred = pred[0]  # V5CenterNet
-        #print("DEBUG: pred has shape", pred.shape)  # [1, 25500, 6]
+            pred = pred[0]  # V5CenterNet (pred.shape: [1, 25500, 6])
         t3 = time_sync()
         dt[1] += t3 - t2
 
@@ -187,7 +186,6 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
 
             # Print time (inference-only)
             LOGGER.info(f'{s}Done. ({t3 - t2:.3f}s)')
-            #print(f'{s}Done. ({t3 - t2:.3f}s)')
 
             # Stream results
             im0 = annotator.result()
